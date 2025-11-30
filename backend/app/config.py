@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import List, Union
 import secrets
 
-from pydantic import AnyHttpUrl, Field
+from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     default_round_minutes: int = 3
     leaderboard_window_hours: int = 24
     max_room_capacity: int = 16
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def split_cors(cls, value):
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
 
 @lru_cache
