@@ -24,6 +24,3 @@ NEXT_PUBLIC_API_BASE=http://localhost:8000/api
 ```
 
 Cloud Run 배포 시 `poetry export`로 requirements.txt를 생성하거나 Dockerfile에서 직접 poetry를 사용하면 됩니다.  
-
-1  11 
-
