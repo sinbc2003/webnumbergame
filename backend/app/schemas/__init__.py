@@ -1,4 +1,4 @@
-from .auth import RegisterRequest, LoginRequest, Token
+from .auth import RegisterRequest, LoginRequest, GuestRequest, Token
 from .user import UserPublic, UserCreate
 from .room import (
     RoomCreate,
@@ -22,6 +22,7 @@ from .dashboard import DashboardSummary, LeaderboardResponse
 __all__ = [
     "RegisterRequest",
     "LoginRequest",
+    "GuestRequest",
     "Token",
     "UserPublic",
     "UserCreate",

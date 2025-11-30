@@ -16,54 +16,49 @@ interface AuthState {
   user?: User;
   token?: string;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<void>;
+  login: (nickname: string) => Promise<void>;
+  register: (nickname: string) => Promise<void>;
   logout: () => void;
   hydrate: () => void;
 }
 
 export const useAuth = create<AuthState>()(
   persist(
-    (set, get) => ({
-      user: undefined,
-      token: undefined,
-      loading: false,
-      hydrate: () => {
-        const token = get().token ?? null;
-        setAuthToken(token);
-      },
-      login: async (email, password) => {
+    (set, get) => {
+      const enterAsGuest = async (nickname: string) => {
         set({ loading: true });
         try {
-          const { data } = await api.post<AuthResponse>("/auth/login", { email, password });
+          const { data } = await api.post<AuthResponse>("/auth/guest", { nickname });
           setAuthToken(data.access_token);
           set({ user: data.user, token: data.access_token });
         } finally {
           set({ loading: false });
         }
-      },
-      register: async (email, username, password) => {
-        set({ loading: true });
-        try {
-          const { data } = await api.post<AuthResponse>("/auth/register", { email, username, password });
-          setAuthToken(data.access_token);
-          set({ user: data.user, token: data.access_token });
-        } finally {
-          set({ loading: false });
-        }
-      },
-      logout: () => {
-        setAuthToken(null);
-        set({ user: undefined, token: undefined });
-      }
-    }),
+      };
+
+      return {
+        user: undefined,
+        token: undefined,
+        loading: false,
+        hydrate: () => {
+          const token = get().token ?? null;
+          setAuthToken(token);
+        },
+        login: async (nickname) => enterAsGuest(nickname),
+        register: async (nickname) => enterAsGuest(nickname),
+        logout: () => {
+          setAuthToken(null);
+          set({ user: undefined, token: undefined });
+        },
+      };
+    },
     {
       name: "number-game-auth",
       onRehydrateStorage: () => (state) => {
         if (state?.token) {
           setAuthToken(state.token);
         }
-      }
+      },
     }
   )
 );
