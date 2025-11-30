@@ -1,0 +1,44 @@
+name: Deploy Backend to Cloud Run
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+      - uses: actions/checkout@v4
+
+      - name: Set up gcloud auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_KEY }}
+
+      - name: Configure gcloud
+        run: |
+          gcloud config set project ${{ secrets.GCP_PROJECT }}
+          gcloud config set run/region ${{ secrets.GCP_REGION }}
+
+      - name: Build & Push image
+        working-directory: backend
+        run: |
+          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT }}/number-game-api .
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy number-game-api \
+            --image gcr.io/${{ secrets.GCP_PROJECT }}/number-game-api \
+            --platform managed \
+            --region ${{ secrets.GCP_REGION }} \
+            --allow-unauthenticated
+
