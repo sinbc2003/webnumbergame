@@ -41,5 +41,5 @@ jobs:
             --platform managed \
             --region ${{ secrets.GCP_REGION }} \
             --allow-unauthenticated \
-            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }},SECRET_KEY=${{ secrets.SECRET_KEY }},CORS_ORIGINS=${{ vars.CORS_ORIGINS }}
+            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }},SECRET_KEY=${{ secrets.SECRET_KEY }},CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
 
