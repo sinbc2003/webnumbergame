@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from sqlalchemy import Column, JSON
 from sqlmodel import Field, SQLModel
 
 from ..enums import MatchStatus, RoundType
@@ -20,7 +21,10 @@ class Match(SQLModel, table=True):
     finished_at: datetime | None = Field(default=None)
     winning_submission_id: str | None = Field(default=None, foreign_key="submissions.id")
     round_number: int = Field(default=1)
-    metadata_snapshot: dict | None = Field(default=None, sa_column_kwargs={"nullable": True})
+    metadata_snapshot: dict | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from sqlalchemy import Column, JSON
 from sqlmodel import Field, SQLModel
 
 from ..enums import TournamentStatus, RoundType
@@ -13,7 +14,10 @@ class Tournament(SQLModel, table=True):
     name: str
     status: TournamentStatus = Field(default=TournamentStatus.DRAFT)
     host_id: str = Field(foreign_key="users.id")
-    bracket: dict | None = Field(default=None, sa_column_kwargs={"nullable": True})
+    bracket: dict | None = Field(
+        default=None,
+        sa_column=Column(JSON, nullable=True),
+    )
     starts_at: datetime | None = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
