@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { getRuntimeConfig } from "@/lib/runtimeConfig";
 
 interface EventMessage {
   type: string;
@@ -13,9 +14,12 @@ interface Props {
 }
 
 const resolveWsBase = () => {
-  const base = process.env.NEXT_PUBLIC_WS_BASE ?? process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
-  const trimmed = base.replace(/\/api$/, "");
-  return trimmed.replace("http", "ws");
+  const { wsBase, apiBase } = getRuntimeConfig();
+  if (wsBase) {
+    return wsBase;
+  }
+  const trimmed = apiBase.replace(/\/api$/, "");
+  return trimmed.replace(/^http/, "ws");
 };
 
 export default function RoomRealtimePanel({ roomId, roomCode }: Props) {

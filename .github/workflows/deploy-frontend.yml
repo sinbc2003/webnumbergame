@@ -47,5 +47,6 @@ jobs:
             --image gcr.io/${{ secrets.GCP_PROJECT }}/number-game-web \
             --platform managed \
             --region ${{ secrets.GCP_REGION }} \
-            --allow-unauthenticated
+            --allow-unauthenticated \
+            --set-env-vars NEXT_PUBLIC_API_BASE=${{ vars.NEXT_PUBLIC_API_BASE }},NEXT_PUBLIC_WS_BASE=${{ vars.NEXT_PUBLIC_WS_BASE }}
 

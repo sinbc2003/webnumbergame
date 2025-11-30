@@ -1,6 +1,9 @@
 import axios from "axios";
+import { getRuntimeConfig } from "./runtimeConfig";
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
+const { apiBase } = getRuntimeConfig();
+
+export const API_BASE = apiBase;
 
 let authToken: string | null = null;
 
