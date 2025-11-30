@@ -2,6 +2,8 @@ import pygame
 import numpy as np
 import time
 
+
+ 
 def generate_ttidi_sound():
     """오답 효과음: '띠디' 소리를 생성합니다."""
     pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=512)
