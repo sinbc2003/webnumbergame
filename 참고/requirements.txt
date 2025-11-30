@@ -1,0 +1,6 @@
+zeroconf
+pyinstaller
+Pillow
+numpy
+pygame
+

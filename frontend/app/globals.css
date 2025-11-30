@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-night-950 text-slate-100 min-h-screen;
+  font-family: "Pretendard Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.card {
+  @apply bg-night-900/70 border border-night-700/60 rounded-xl p-6 shadow-lg shadow-black/30;
+}
+

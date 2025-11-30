@@ -1,0 +1,17 @@
+[
+  {
+    "target": 16,
+    "optimal_cost": 3,
+    "threshold_coin": 8
+  },
+  {
+    "target": 25,
+    "optimal_cost": 5,
+    "threshold_coin": 10
+  },
+  {
+    "target": 30,
+    "optimal_cost": 6,
+    "threshold_coin": 12
+  }
+]

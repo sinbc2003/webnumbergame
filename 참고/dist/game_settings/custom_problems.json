@@ -1,0 +1,18 @@
+[
+  {
+    "target": 915,
+    "optimal_cost": 28
+  },
+  {
+    "target": 805,
+    "optimal_cost": 24
+  },
+  {
+    "target": 695,
+    "optimal_cost": 28
+  },
+  {
+    "target": 1013,
+    "optimal_cost": 24
+  }
+]
