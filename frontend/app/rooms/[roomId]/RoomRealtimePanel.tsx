@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
+import type { Participant } from "@/types/api";
 
 interface EventMessage {
   type: string;
@@ -16,6 +17,9 @@ interface Props {
   roomCode: string;
   hostId: string;
   currentRound: number;
+  playerOneId?: string;
+  playerTwoId?: string;
+  participants: Participant[];
 }
 
 const resolveWsBase = () => {
@@ -27,35 +31,80 @@ const resolveWsBase = () => {
   return trimmed.replace(/^http/, "ws");
 };
 
-export default function RoomRealtimePanel({ roomId, roomCode, hostId, currentRound }: Props) {
+export default function RoomRealtimePanel({
+  roomId,
+  roomCode,
+  hostId,
+  currentRound,
+  playerOneId,
+  playerTwoId,
+  participants,
+}: Props) {
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
   const [events, setEvents] = useState<EventMessage[]>([]);
-  const { user } = useAuth();
-  const isHost = user?.id === hostId;
-
   const [roundNumber, setRoundNumber] = useState(currentRound);
   const [durationMinutes, setDurationMinutes] = useState(3);
   const [problemCount, setProblemCount] = useState(5);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [playerOne, setPlayerOne] = useState<string | undefined>(playerOneId ?? undefined);
+  const [playerTwo, setPlayerTwo] = useState<string | undefined>(playerTwoId ?? undefined);
+  const [participantList, setParticipantList] = useState<Participant[]>(participants);
+  const [assigningSlot, setAssigningSlot] = useState<"player_one" | "player_two" | null>(null);
+  const [selectedPlayers, setSelectedPlayers] = useState({
+    player_one: playerOneId ?? "",
+    player_two: playerTwoId ?? "",
+  });
+
+  const { user } = useAuth();
+  const isHost = user?.id === hostId;
+
+  useEffect(() => {
+    setRoundNumber(currentRound);
+  }, [currentRound]);
+
+  useEffect(() => {
+    setPlayerOne(playerOneId ?? undefined);
+    setPlayerTwo(playerTwoId ?? undefined);
+    setSelectedPlayers({
+      player_one: playerOneId ?? "",
+      player_two: playerTwoId ?? "",
+    });
+  }, [playerOneId, playerTwoId]);
+
+  useEffect(() => {
+    setParticipantList(participants);
+  }, [participants]);
 
   useEffect(() => {
     const ws = new WebSocket(wsUrl);
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        setEvents((prev) => [data, ...prev].slice(0, 20));
+        if (data.type === "player_assignment") {
+          setPlayerOne(data.player_one_id ?? undefined);
+          setPlayerTwo(data.player_two_id ?? undefined);
+          setParticipantList((prev) =>
+            prev.map((p) => ({
+              ...p,
+              role:
+                p.user_id === data.player_one_id || p.user_id === data.player_two_id ? "player" : "spectator",
+            })),
+          );
+        } else if (data.type === "participant_joined") {
+          setParticipantList((prev) => {
+            if (prev.some((p) => p.id === data.participant.id)) return prev;
+            return [...prev, data.participant];
+          });
+        }
+        setEvents((prev) => [data, ...prev].slice(0, 30));
       } catch {
         // ignore malformed payloads
       }
     };
     return () => ws.close();
   }, [wsUrl]);
-
-  useEffect(() => {
-    setRoundNumber(currentRound);
-  }, [currentRound]);
 
   const handleStartRound = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -77,11 +126,92 @@ export default function RoomRealtimePanel({ roomId, roomCode, hostId, currentRou
     }
   };
 
+  const handleAssign = async (slot: "player_one" | "player_two") => {
+    setAssigningSlot(slot);
+    setError(null);
+    try {
+      await api.post(`/rooms/${roomId}/players`, {
+        slot,
+        user_id: selectedPlayers[slot] || null,
+      });
+      setSuccess("플레이어 구성을 업데이트했습니다.");
+    } catch (err: any) {
+      setError(err?.response?.data?.detail ?? "플레이어를 지정하지 못했습니다.");
+    } finally {
+      setAssigningSlot(null);
+    }
+  };
+
+  const options = [{ label: "비워두기", value: "" }].concat(
+    participantList.map((p) => ({
+      label: `참가자 ${p.user_id.slice(0, 6)}…`,
+      value: p.user_id,
+    })),
+  );
+
+  const playerLabel = (userId?: string) => {
+    if (!userId) return "비어 있음";
+    const participant = participantList.find((p) => p.user_id === userId);
+    return participant ? `참가자 ${participant.user_id.slice(0, 6)}…` : userId.slice(0, 6);
+  };
+
+  const spectators = participantList.filter((p) => p.role !== "player");
+
   return (
     <div className="card space-y-4">
       <div>
         <p className="text-sm font-semibold text-night-200">참가 코드</p>
         <p className="text-2xl font-bold tracking-widest text-white">{roomCode}</p>
+      </div>
+
+      <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
+        <div className="flex items-center justify-between">
+          <p className="font-semibold text-night-100">플레이어 슬롯</p>
+          <p className="text-xs text-night-500">방장 전용</p>
+        </div>
+        {["player_one", "player_two"].map((slot) => {
+          const isPlayerOne = slot === "player_one";
+          const assigned = isPlayerOne ? playerOne : playerTwo;
+          return (
+            <div
+              key={slot}
+              className="mt-3 flex flex-col gap-2 border-b border-night-900 pb-3 text-night-200 last:border-0 last:pb-0"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-night-300">{isPlayerOne ? "플레이어 1" : "플레이어 2"}</p>
+                <p className="font-semibold text-white">{playerLabel(assigned)}</p>
+              </div>
+              {isHost && (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select
+                    value={selectedPlayers[slot as "player_one" | "player_two"]}
+                    onChange={(e) =>
+                      setSelectedPlayers((prev) => ({
+                        ...prev,
+                        [slot]: e.target.value,
+                      }))
+                    }
+                    className="flex-1 rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                  >
+                    {options.map((option) => (
+                      <option key={`${slot}-${option.value || "none"}`} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => handleAssign(slot as "player_one" | "player_two")}
+                    disabled={assigningSlot === slot}
+                    className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
+                  >
+                    지정
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {isHost ? (
@@ -143,6 +273,16 @@ export default function RoomRealtimePanel({ roomId, roomCode, hostId, currentRou
           방장이 라운드를 시작하면 여기에 실시간 이벤트가 표시됩니다.
         </div>
       )}
+
+      <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
+        <p className="text-sm font-semibold text-night-200">관전자 {spectators.length}명</p>
+        <div className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-night-400">
+          {spectators.length === 0 && <p>아직 관전자가 없습니다.</p>}
+          {spectators.map((spectator) => (
+            <p key={spectator.id}>• {spectator.user_id.slice(0, 8)}…</p>
+          ))}
+        </div>
+      </div>
 
       <div>
         <p className="text-sm font-semibold text-night-200">실시간 이벤트</p>

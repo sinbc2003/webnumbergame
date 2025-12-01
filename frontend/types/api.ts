@@ -13,6 +13,8 @@ export interface User {
   created_at: string;
 }
 
+export type ParticipantRole = "player" | "spectator";
+
 export interface Room {
   id: string;
   code: string;
@@ -23,6 +25,8 @@ export interface Room {
   round_type: RoundType;
   max_players: number;
   current_round: number;
+  player_one_id?: string | null;
+  player_two_id?: string | null;
   created_at: string;
 }
 
@@ -33,6 +37,7 @@ export interface Participant {
   is_ready: boolean;
   order_index?: number | null;
   score: number;
+  role: ParticipantRole;
 }
 
 export interface LeaderboardEntry {
@@ -108,5 +113,7 @@ export interface ActiveMatch {
   current_index: number;
   total_problems: number;
   problems: ActiveMatchProblem[];
+  player_one_id?: string | null;
+  player_two_id?: string | null;
 }
 

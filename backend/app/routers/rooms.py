@@ -21,6 +21,7 @@ from ..schemas.room import (
     ActiveMatchResponse,
     ActiveMatchProblem,
     PlayerAssignmentRequest,
+    InputUpdateRequest,
 )
 from ..services.game_service import GameService
 from ..services.room_service import RoomService
@@ -112,6 +113,16 @@ async def join_room(
             "participant": ParticipantPublic.model_validate(participant).model_dump(),
         },
     )
+    if participant.role == ParticipantRole.PLAYER:
+        await manager.broadcast_room(
+            room.id,
+            {
+                "type": "player_assignment",
+                "room_id": room.id,
+                "player_one_id": room.player_one_id,
+                "player_two_id": room.player_two_id,
+            },
+        )
     return ParticipantPublic.model_validate(participant)
 
 
@@ -163,6 +174,29 @@ async def assign_player(
         },
     )
     return RoomPublic.model_validate(room)
+
+
+@router.post("/{room_id}/inputs", status_code=status.HTTP_204_NO_CONTENT)
+async def update_player_input(
+    room_id: str,
+    payload: InputUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    room = await _get_room_or_404(session, room_id)
+    if current_user.id not in {room.player_one_id, room.player_two_id}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="플레이어만 입력을 전송할 수 있습니다.")
+
+    await manager.broadcast_room(
+        room.id,
+        {
+            "type": "input_update",
+            "room_id": room.id,
+            "user_id": current_user.id,
+            "expression": payload.expression,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
 
 
 @router.post("/{room_id}/rounds", response_model=dict)

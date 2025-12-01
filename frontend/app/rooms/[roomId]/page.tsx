@@ -64,22 +64,13 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
               </div>
             </div>
           </div>
-          <div className="card">
-            <p className="text-sm font-semibold text-night-200">참가자</p>
-            <div className="mt-3 space-y-2">
-              {participants.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between rounded-lg border border-night-800/70 bg-night-950/40 px-3 py-2 text-sm"
-                >
-                  <p className="text-night-200">플레이어 {p.user_id.slice(0, 6)}…</p>
-                  <p className="text-night-400">{p.team_label ?? "개인전"}</p>
-                </div>
-              ))}
-              {participants.length === 0 && <p className="text-sm text-night-500">아직 참가자가 없습니다.</p>}
-            </div>
-          </div>
-          <RoomGamePanel roomId={room.id} roundType={room.round_type} />
+          <RoomGamePanel
+            roomId={room.id}
+            roundType={room.round_type}
+            playerOneId={room.player_one_id ?? undefined}
+            playerTwoId={room.player_two_id ?? undefined}
+            participants={participants}
+          />
         </section>
         <section>
           <RoomRealtimePanel
@@ -87,6 +78,9 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
             roomCode={room.code}
             hostId={room.host_id}
             currentRound={room.current_round}
+            playerOneId={room.player_one_id ?? undefined}
+            playerTwoId={room.player_two_id ?? undefined}
+            participants={participants}
           />
         </section>
       </main>

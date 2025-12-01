@@ -66,6 +66,10 @@ class SubmissionRequest(BaseModel):
     team_label: str | None = None
 
 
+class InputUpdateRequest(BaseModel):
+    expression: str = Field(default="", max_length=256)
+
+
 class TeamMemberInput(BaseModel):
     user_id: str
     allocated_budget: int
