@@ -474,12 +474,19 @@ export default function RoomGamePanel({
     }
   }, [remaining, playTone]);
 
+  const parseDeadline = useCallback((value?: string | null) => {
+    if (!value) return null;
+    const normalized = /z$/i.test(value) ? value : `${value}Z`;
+    const timestamp = Date.parse(normalized);
+    return Number.isNaN(timestamp) ? null : timestamp;
+  }, []);
+
   useEffect(() => {
-    if (!data?.deadline) {
+    const deadline = parseDeadline(data?.deadline);
+    if (!deadline) {
       setRemaining(null);
       return;
     }
-    const deadline = new Date(data.deadline).getTime();
     const update = () => {
       const diff = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
       setRemaining(diff);
@@ -487,7 +494,7 @@ export default function RoomGamePanel({
     update();
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
-  }, [data?.deadline]);
+  }, [data?.deadline, parseDeadline]);
 
   const mySlot: BoardSlot | null =
     user?.id && user.id === playerIdsRef.current.playerOne
@@ -668,8 +675,8 @@ export default function RoomGamePanel({
             <p className="text-xs text-night-500">다음 문제는 공개되지 않으며, 현재 문제만 확인할 수 있습니다.</p>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {(["playerOne", "playerTwo"] as BoardSlot[]).map((slot) => {
+          <div className={`grid gap-6 ${mySlot ? "" : "lg:grid-cols-2"}`}>
+            {(mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[])).map((slot) => {
               const isMine = mySlot === slot;
               const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
               return (
@@ -687,6 +694,7 @@ export default function RoomGamePanel({
                   submitting={submittingSlot === slot}
                   placeholder={slot === "playerOne" ? "예: (1+2)*3" : "예: (1+3)*2"}
                   warningMessage={inputWarnings[slot]}
+                  focusLayout={Boolean(mySlot)}
                 />
               );
             })}
@@ -710,6 +718,7 @@ interface PlayerPanelProps {
   submitting: boolean;
   placeholder?: string;
   warningMessage?: string | null;
+  focusLayout?: boolean;
 }
 
 function PlayerPanel({
@@ -725,15 +734,32 @@ function PlayerPanel({
   submitting,
   placeholder,
   warningMessage,
+  focusLayout,
 }: PlayerPanelProps) {
+  const containerClasses = focusLayout
+    ? "rounded-2xl border-2 border-indigo-600 bg-night-950/40 p-6 text-base text-night-100 shadow-xl"
+    : "rounded-xl border border-night-800 bg-night-950/30 p-4 text-sm text-night-200";
+  const textareaClasses = focusLayout
+    ? "mt-3 h-44 w-full rounded-xl border-2 border-indigo-600/40 bg-night-900 px-4 py-3 text-xl text-white focus:border-indigo-400 focus:outline-none"
+    : "mt-3 h-24 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none";
+  const historyWrapperClasses = focusLayout
+    ? "mt-3 max-h-56 space-y-3 overflow-y-auto text-sm text-night-200"
+    : "mt-2 max-h-36 space-y-2 overflow-y-auto text-xs text-night-400";
+
   return (
-    <div className="rounded-xl border border-night-800 bg-night-950/30 p-4 text-sm text-night-200">
+    <div className={containerClasses}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-night-400">{title}</p>
-          <p className="text-lg font-semibold text-white">{userLabel}</p>
+          <p className={focusLayout ? "text-night-300 text-sm" : "text-night-400"}>{title}</p>
+          <p className={focusLayout ? "text-2xl font-semibold text-white" : "text-lg font-semibold text-white"}>
+            {userLabel}
+          </p>
         </div>
-        {isMine && <span className="text-xs text-indigo-400">내 화면</span>}
+        {isMine && (
+          <span className={focusLayout ? "rounded-full border border-indigo-400 px-3 py-1 text-xs text-indigo-200" : "text-xs text-indigo-400"}>
+            내 화면
+          </span>
+        )}
       </div>
 
       <textarea
@@ -754,7 +780,7 @@ function PlayerPanel({
         disabled={!isMine || disabled || submitting}
         spellCheck={false}
         autoComplete="off"
-        className="mt-3 h-24 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+        className={textareaClasses}
       />
 
       {warningMessage && <p className="mt-1 text-xs text-amber-200">{warningMessage}</p>}
@@ -771,12 +797,16 @@ function PlayerPanel({
       )}
 
       {isMine && (
-        <p className="mt-1 text-xs text-night-500">Enter 키를 누르면 즉시 제출됩니다.</p>
+        <p className={focusLayout ? "mt-2 text-sm text-night-400" : "mt-1 text-xs text-night-500"}>
+          Enter 키를 누르면 즉시 제출됩니다.
+        </p>
       )}
 
       <div className="mt-4">
-        <p className="text-xs font-semibold text-night-300">최근 기록</p>
-        <div className="mt-2 max-h-36 space-y-2 overflow-y-auto text-xs text-night-400">
+        <p className={focusLayout ? "text-sm font-semibold text-night-200" : "text-xs font-semibold text-night-300"}>
+          최근 기록
+        </p>
+        <div className={historyWrapperClasses}>
           {history.length === 0 && <p>아직 제출 기록이 없습니다.</p>}
           {history.map((entry, index) => (
             <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
