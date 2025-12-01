@@ -85,10 +85,6 @@ export default function AuthForm({ mode }: Props) {
               className="mt-1 w-full rounded-lg border border-night-700 bg-night-950/70 p-2 text-white"
             />
           </label>
-          <p className="text-xs text-night-500">
-            기본 관리자 아이디는 <span className="font-semibold text-night-200">gshadmin2025</span>, 비밀번호는{" "}
-            <span className="font-semibold text-night-200">12345qwert!</span> 입니다.
-          </p>
         </>
       ) : (
         <label className="block text-sm text-night-300">

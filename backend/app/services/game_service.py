@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
+from sqlalchemy import case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -47,6 +48,16 @@ class GameService:
             .where(Match.room_id == room_id)
             .where(Match.status == MatchStatus.ACTIVE)
             .order_by(Match.created_at.desc())
+        )
+        result = await self.session.execute(statement)
+        return result.scalars().first()
+
+    async def get_best_submission(self, match_id: str) -> Optional[Submission]:
+        distance_nulls_last = case((Submission.distance.is_(None), 1), else_=0)
+        statement = (
+            select(Submission)
+            .where(Submission.match_id == match_id)
+            .order_by(distance_nulls_last, Submission.distance, Submission.submitted_at, Submission.cost)
         )
         result = await self.session.execute(statement)
         return result.scalars().first()

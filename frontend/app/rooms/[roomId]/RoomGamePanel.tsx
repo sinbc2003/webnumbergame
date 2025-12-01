@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
 
@@ -37,6 +38,22 @@ interface BoardState {
   expression: string;
   history: HistoryEntry[];
 }
+
+type RoundOutcome = {
+  reason: string;
+  winnerId?: string | null;
+  distance?: number | null;
+  score?: number | null;
+};
+
+const allowedTokens = new Set(["1", "+", "*", "(", ")"]);
+const sanitizeExpression = (value: string) =>
+  value
+    .split("")
+    .filter((char) => allowedTokens.has(char))
+    .join("");
+const INPUT_WARNING = "사용 가능한 기호는 1, +, *, (, ) 만 허용됩니다.";
+const CRITICAL_COUNTDOWN_THRESHOLD = 5;
 
 interface Props {
   roomId: string;
@@ -76,6 +93,18 @@ export default function RoomGamePanel({
   const [statusError, setStatusError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [participantState, setParticipantState] = useState<Participant[]>(participants);
+  const [inputWarnings, setInputWarnings] = useState<Record<BoardSlot, string | null>>({
+    playerOne: null,
+    playerTwo: null,
+  });
+  const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null);
+  const [preCountdown, setPreCountdown] = useState<number | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const userInteractedRef = useRef(false);
+  const tickRef = useRef<number | null>(null);
+  const [initialRemaining, setInitialRemaining] = useState<number | null>(null);
+  const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
 
   const playerIdsRef = useRef<{ playerOne: string | undefined; playerTwo: string | undefined }>({
     playerOne: playerOneId ?? undefined,
@@ -98,6 +127,15 @@ export default function RoomGamePanel({
     setParticipantState(participants);
   }, [participants]);
 
+  useEffect(() => {
+    return () => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const fetcher = async (url: string) => {
     const { data } = await api.get<ActiveMatch | null>(url);
     return data;
@@ -110,12 +148,114 @@ export default function RoomGamePanel({
 
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
 
+  useEffect(() => {
+    if (!data?.match_id) {
+      setActiveMatchId(null);
+      setInitialRemaining(null);
+      return;
+    }
+    setActiveMatchId((prev) => {
+      if (prev === data.match_id) {
+        return prev;
+      }
+      setInitialRemaining(null);
+      tickRef.current = null;
+      return data.match_id;
+    });
+  }, [data?.match_id]);
+
   const slotFromUserId = (userId?: string | null): BoardSlot | null => {
     if (!userId) return null;
     if (userId === playerIdsRef.current.playerOne) return "playerOne";
     if (userId === playerIdsRef.current.playerTwo) return "playerTwo";
     return null;
   };
+
+  const ensureAudioContext = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return null;
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+    if (audioContextRef.current.state === "suspended") {
+      audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  const armAudio = useCallback(() => {
+    if (userInteractedRef.current) return;
+    if (ensureAudioContext()) {
+      userInteractedRef.current = true;
+    }
+  }, [ensureAudioContext]);
+
+  const playTone = useCallback(
+    (type: "success" | "error" | "tick") => {
+      const ctx = ensureAudioContext();
+      if (!ctx) return;
+
+      const config =
+        type === "success"
+          ? { freq: 920, duration: 0.25, wave: "sine", gain: 0.25 }
+          : type === "error"
+            ? { freq: 220, duration: 0.35, wave: "sawtooth", gain: 0.35 }
+            : { freq: 660, duration: 0.12, wave: "square", gain: 0.18 };
+
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.frequency.value = config.freq;
+      oscillator.type = config.wave as OscillatorType;
+      gain.gain.value = config.gain;
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      oscillator.start(now);
+      oscillator.stop(now + config.duration);
+    },
+    [ensureAudioContext],
+  );
+
+  const triggerPreCountdown = useCallback(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+    setPreCountdown(3);
+    countdownTimerRef.current = setInterval(() => {
+      setPreCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  const handleExpressionChange = useCallback(
+    (slot: BoardSlot, rawValue: string) => {
+      armAudio();
+      const sanitized = sanitizeExpression(rawValue);
+      setBoards((prev) => ({
+        ...prev,
+        [slot]: { ...prev[slot], expression: sanitized },
+      }));
+      setPendingInput({ slot, value: sanitized });
+      setInputWarnings((prev) => ({
+        ...prev,
+        [slot]: sanitized !== rawValue ? INPUT_WARNING : null,
+      }));
+      if (sanitized !== rawValue) {
+        playTone("error");
+      }
+    },
+    [armAudio, playTone],
+  );
 
   useEffect(() => {
     if (!user) return;
@@ -180,22 +320,33 @@ export default function RoomGamePanel({
           case "submission_received": {
             if (!payload.submission) break;
             const slot = slotFromUserId(payload.submission.user_id);
-            if (!slot) break;
-            setBoards((prev) => {
-              const nextHistory: HistoryEntry[] = [
-                {
-                  expression: payload.submission!.expression,
-                  score: payload.submission!.score,
-                  value: payload.submission!.result_value ?? null,
-                  timestamp: new Date().toISOString(),
-                },
-                ...prev[slot].history,
-              ].slice(0, 10);
-              return {
-                ...prev,
-                [slot]: { ...prev[slot], history: nextHistory },
-              };
-            });
+            if (slot) {
+              setBoards((prev) => {
+                const nextHistory: HistoryEntry[] = [
+                  {
+                    expression: payload.submission!.expression,
+                    score: payload.submission!.score,
+                    value: payload.submission!.result_value ?? null,
+                    timestamp: new Date().toISOString(),
+                  },
+                  ...prev[slot].history,
+                ].slice(0, 10);
+                return {
+                  ...prev,
+                  [slot]: { ...prev[slot], history: nextHistory },
+                };
+              });
+            }
+            if (payload.submission.user_id && payload.submission.user_id === user?.id) {
+              if (payload.submission.distance === 0) {
+                setStatusMessage("정답입니다! 다음 문제를 기다려 주세요.");
+                setStatusError(null);
+                playTone("success");
+              } else if (typeof payload.submission.distance === "number") {
+                setStatusError(`목표까지 ${payload.submission.distance}만큼 차이납니다.`);
+                playTone("error");
+              }
+            }
             break;
           }
           case "round_started": {
@@ -203,7 +354,12 @@ export default function RoomGamePanel({
               playerOne: createBoardState(),
               playerTwo: createBoardState(),
             });
-            setStatusMessage("새 라운드가 시작되었습니다.");
+            setStatusMessage("새 라운드가 시작되었습니다. 카운트다운 후 입력이 열립니다.");
+            setStatusError(null);
+            setRoundOutcome(null);
+            setInitialRemaining(null);
+            tickRef.current = null;
+            triggerPreCountdown();
             mutate();
             break;
           }
@@ -213,7 +369,40 @@ export default function RoomGamePanel({
             break;
           }
           case "round_finished": {
-            setStatusMessage("라운드가 종료되었습니다.");
+            const reason = payload.reason ?? "optimal";
+            const winnerSubmission = payload.winner_submission;
+            const winnerId = winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
+            setRoundOutcome({
+              reason,
+              winnerId,
+              distance: winnerSubmission?.distance ?? null,
+              score: winnerSubmission?.score ?? null,
+            });
+            setPreCountdown(null);
+            setInitialRemaining(null);
+            tickRef.current = null;
+            setBoards({
+              playerOne: createBoardState(),
+              playerTwo: createBoardState(),
+            });
+            if (winnerId) {
+              const winnerLabel = participantLabel(winnerId);
+              if (winnerId === user?.id) {
+                setStatusMessage(reason === "timeout" ? "시간 종료! 근사 정답으로 승리했습니다." : "정답으로 승리했습니다!");
+                setStatusError(null);
+                playTone("success");
+              } else {
+                setStatusError(
+                  reason === "timeout"
+                    ? `${winnerLabel} 님이 더 가까운 해답을 제출했습니다.`
+                    : `${winnerLabel} 님이 정답을 찾아 라운드가 종료되었습니다.`,
+                );
+                playTone("error");
+              }
+            } else {
+              setStatusMessage("시간 종료! 제출된 식이 없어 무승부입니다.");
+              setStatusError(null);
+            }
             mutate();
             break;
           }
@@ -231,6 +420,27 @@ export default function RoomGamePanel({
     };
     return () => ws.close();
   }, [user, wsUrl, mutate, router]);
+
+  useEffect(() => {
+    if (remaining === null) {
+      tickRef.current = null;
+      return;
+    }
+    setInitialRemaining((prev) => {
+      if (prev === null || remaining > prev) {
+        return remaining;
+      }
+      return prev;
+    });
+    if (remaining <= CRITICAL_COUNTDOWN_THRESHOLD) {
+      if (tickRef.current !== remaining) {
+        playTone("tick");
+        tickRef.current = remaining;
+      }
+    } else {
+      tickRef.current = null;
+    }
+  }, [remaining, playTone]);
 
   useEffect(() => {
     if (!data?.deadline) {
@@ -264,6 +474,7 @@ export default function RoomGamePanel({
   }, [pendingInput, mySlot, roomId]);
 
   const submitExpression = async (slot: BoardSlot) => {
+    armAudio();
     const value = boards[slot].expression.trim();
     if (!value) {
       setStatusError("식을 입력해 주세요.");
@@ -283,8 +494,13 @@ export default function RoomGamePanel({
         [slot]: { ...prev[slot], expression: "" },
       }));
       setStatusMessage("제출했습니다! 결과를 기다려 주세요.");
+      setInputWarnings((prev) => ({
+        ...prev,
+        [slot]: null,
+      }));
     } catch (err: any) {
       setStatusError(err?.response?.data?.detail ?? "제출 중 오류가 발생했습니다.");
+      playTone("error");
     } finally {
       setSubmittingSlot(null);
     }
@@ -311,6 +527,19 @@ export default function RoomGamePanel({
 
   const activeMatch = data ?? null;
   const hasActiveMatch = Boolean(activeMatch);
+  const formattedRemaining = formatRemaining();
+  const countdownPercent =
+    initialRemaining && remaining !== null && initialRemaining > 0
+      ? Math.max(0, Math.min(1, remaining / initialRemaining))
+      : 0;
+  const isCountdownCritical = remaining !== null && remaining <= CRITICAL_COUNTDOWN_THRESHOLD;
+  const problemIndicators = activeMatch
+    ? Array.from({ length: activeMatch.total_problems }, (_, index) => {
+        if (index < activeMatch.current_index) return "done";
+        if (index === activeMatch.current_index) return "current";
+        return "hidden";
+      })
+    : [];
   const containerClass = hasActiveMatch
     ? "fixed inset-0 z-40 overflow-y-auto bg-night-950/95 p-6 space-y-4"
     : "card space-y-4";
@@ -341,8 +570,29 @@ export default function RoomGamePanel({
       {statusMessage && <p className="text-sm text-green-400">{statusMessage}</p>}
       {statusError && <p className="text-sm text-red-400">{statusError}</p>}
 
+      {roundOutcome && (
+        <div className="rounded-lg border border-night-800 bg-night-900/40 p-4 text-sm text-night-200">
+          <p className="font-semibold text-night-100">
+            {roundOutcome.reason === "timeout" ? "시간 종료 결과" : "라운드 결과"}
+          </p>
+          <p className="mt-1 text-night-300">
+            승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
+          </p>
+          {typeof roundOutcome.distance === "number" && (
+            <p className="text-xs text-night-500">목표와의 차이: {roundOutcome.distance}</p>
+          )}
+        </div>
+      )}
+
       {hasActiveMatch && (
         <>
+          {preCountdown !== null && (
+            <div className="rounded-xl border border-indigo-500/70 bg-night-900/60 p-4 text-center text-white">
+              <p className="text-sm text-night-400">라운드 시작까지</p>
+              <p className="text-4xl font-bold text-indigo-200">{preCountdown}</p>
+            </div>
+          )}
+
           <div className="grid gap-3 rounded-lg border border-night-800/60 bg-night-950/40 p-4 text-sm text-night-200 sm:grid-cols-2">
             <div>
               <p className="text-night-500">현재 문제</p>
@@ -350,7 +600,15 @@ export default function RoomGamePanel({
             </div>
             <div>
               <p className="text-night-500">남은 시간</p>
-              <p className="text-2xl font-bold text-indigo-400">{formatRemaining()}</p>
+              <p className={`text-3xl font-bold ${isCountdownCritical ? "text-red-400" : "text-indigo-300"}`}>
+                {formattedRemaining}
+              </p>
+              <div className="mt-2 h-2 w-full rounded-full bg-night-900">
+                <div
+                  className={`h-full rounded-full ${isCountdownCritical ? "bg-red-500" : "bg-indigo-500"}`}
+                  style={{ width: `${countdownPercent * 100}%` }}
+                />
+              </div>
             </div>
             <div>
               <p className="text-night-500">최적 코스트</p>
@@ -364,24 +622,26 @@ export default function RoomGamePanel({
             </div>
           </div>
 
-          <div className="space-y-2 rounded-lg border border-night-800/60 bg-night-950/30 p-4 text-xs text-night-300">
-            <p className="font-semibold text-night-200">이번 라운드 문제 목록</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {activeMatch?.problems.map((problem) => (
-                <div
-                  key={`${problem.target_number}-${problem.index}`}
-                  className={`rounded-md border px-3 py-2 ${
-                    problem.index === activeMatch.current_index
-                      ? "border-indigo-500 bg-indigo-500/10 text-indigo-100"
-                      : "border-night-800 text-night-300"
+          <div className="space-y-2 rounded-lg border border-night-800/60 bg-night-950/30 p-4 text-sm text-night-300">
+            <p className="font-semibold text-night-200">문제 진행 상황</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {problemIndicators.length === 0 && <p className="text-night-500">등록된 문제가 없습니다.</p>}
+              {problemIndicators.map((state, index) => (
+                <span
+                  key={`indicator-${index}`}
+                  className={`rounded-full px-3 py-1 text-xs ${
+                    state === "done"
+                      ? "bg-emerald-600/20 text-emerald-300"
+                      : state === "current"
+                        ? "bg-indigo-600/20 text-indigo-200"
+                        : "bg-night-800 text-night-500"
                   }`}
                 >
-                  <p>#{problem.index + 1}</p>
-                  <p className="text-sm font-semibold text-white">{problem.target_number}</p>
-                  <p className="text-[11px] text-night-400">최적 {problem.optimal_cost}</p>
-                </div>
+                  #{index + 1} · {state === "done" ? "완료" : state === "current" ? "진행 중" : "비공개"}
+                </span>
               ))}
             </div>
+            <p className="text-xs text-night-500">다음 문제는 공개되지 않으며, 현재 문제만 확인할 수 있습니다.</p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
@@ -395,22 +655,14 @@ export default function RoomGamePanel({
                   userLabel={participantLabel(assignedUser)}
                   expression={boards[slot].expression}
                   history={boards[slot].history}
-                  onExpressionChange={
-                    isMine
-                      ? (value) => {
-                          setBoards((prev) => ({
-                            ...prev,
-                            [slot]: { ...prev[slot], expression: value },
-                          }));
-                          setPendingInput({ slot, value });
-                        }
-                      : undefined
-                  }
+                  onExpressionChange={isMine ? (value) => handleExpressionChange(slot, value) : undefined}
                   onSubmit={isMine ? () => submitExpression(slot) : undefined}
+                  onFocus={isMine ? armAudio : undefined}
                   disabled={!activeMatch || !assignedUser}
                   isMine={isMine}
                   submitting={submittingSlot === slot}
                   placeholder={slot === "playerOne" ? "예: (1+2)*3" : "예: (1+3)*2"}
+                  warningMessage={inputWarnings[slot]}
                 />
               );
             })}
@@ -428,10 +680,12 @@ interface PlayerPanelProps {
   history: HistoryEntry[];
   onExpressionChange?: (value: string) => void;
   onSubmit?: () => void;
+  onFocus?: () => void;
   disabled: boolean;
   isMine: boolean;
   submitting: boolean;
   placeholder?: string;
+  warningMessage?: string | null;
 }
 
 function PlayerPanel({
@@ -441,10 +695,12 @@ function PlayerPanel({
   history,
   onExpressionChange,
   onSubmit,
+  onFocus,
   disabled,
   isMine,
   submitting,
   placeholder,
+  warningMessage,
 }: PlayerPanelProps) {
   return (
     <div className="rounded-xl border border-night-800 bg-night-950/30 p-4 text-sm text-night-200">
@@ -459,10 +715,25 @@ function PlayerPanel({
       <textarea
         value={expression}
         onChange={(e) => onExpressionChange?.(e.target.value)}
+        onFocus={onFocus}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            onSubmit?.();
+            return;
+          }
+          if (event.key === " " || event.key === "Tab") {
+            event.preventDefault();
+          }
+        }}
         placeholder={placeholder}
         disabled={!isMine || disabled || submitting}
+        spellCheck={false}
+        autoComplete="off"
         className="mt-3 h-24 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
       />
+
+      {warningMessage && <p className="mt-1 text-xs text-amber-200">{warningMessage}</p>}
 
       {isMine && onSubmit && (
         <button
@@ -473,6 +744,10 @@ function PlayerPanel({
         >
           {submitting ? "제출 중..." : "제출하기"}
         </button>
+      )}
+
+      {isMine && (
+        <p className="mt-1 text-xs text-night-500">Enter 키를 누르면 즉시 제출됩니다.</p>
       )}
 
       <div className="mt-4">

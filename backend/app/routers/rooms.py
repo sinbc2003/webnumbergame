@@ -8,9 +8,9 @@ from sqlmodel import select
 from ..config import get_settings
 from ..database import get_session
 from ..dependencies import get_current_user
-from ..enums import RoundType, ParticipantRole
+from ..enums import RoundType, ParticipantRole, MatchStatus
 from ..events.manager import manager
-from ..models import Problem, Room, RoomParticipant, Submission, User
+from ..models import Match, Problem, Room, RoomParticipant, Submission, User
 from ..schemas.room import (
     RoomCreate,
     RoomPublic,
@@ -368,6 +368,40 @@ def _serialize_submission(submission: Submission) -> dict:
     }
 
 
+def _round_finished_payload(room_id: str, match_id: str, submission: Submission | None, reason: str) -> dict:
+    payload = {
+        "type": "round_finished",
+        "room_id": room_id,
+        "match_id": match_id,
+        "reason": reason,
+        "winner_submission_id": submission.id if submission else None,
+    }
+    if submission:
+        payload["winner_submission"] = _serialize_submission(submission)
+    return payload
+
+
+async def _maybe_finish_expired_match(
+    game_service: GameService,
+    room: Room,
+    match: Match,
+) -> None:
+    if not match.deadline or match.status != MatchStatus.ACTIVE:
+        return
+    if datetime.utcnow() < match.deadline:
+        return
+
+    best_submission = await game_service.get_best_submission(match.id)
+    closed_match = await game_service.close_match(
+        match,
+        best_submission.id if best_submission else None,
+    )
+    await manager.broadcast_room(
+        room.id,
+        _round_finished_payload(room.id, closed_match.id, best_submission, reason="timeout"),
+    )
+
+
 @router.post("/{room_id}/submit", response_model=dict)
 async def submit_expression(
     room_id: str,
@@ -430,13 +464,11 @@ async def submit_expression(
             await game_service.close_match(match, submission.id)
             await manager.broadcast_room(
                 room.id,
-                {
-                    "type": "round_finished",
-                    "room_id": room.id,
-                    "match_id": match.id,
-                    "winner_submission_id": submission.id,
-                },
+                _round_finished_payload(room.id, match.id, submission, reason="optimal"),
             )
+            return event_payload
+
+    await _maybe_finish_expired_match(game_service, room, match)
 
     return event_payload
 
