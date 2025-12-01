@@ -163,14 +163,15 @@ export default function RoomGamePanel({
             break;
           }
           case "submission_received": {
-            const slot = slotFromUserId(payload.submission?.user_id);
+            if (!payload.submission) break;
+            const slot = slotFromUserId(payload.submission.user_id);
             if (!slot) break;
             setBoards((prev) => {
               const nextHistory: HistoryEntry[] = [
                 {
-                  expression: payload.submission.expression,
-                  score: payload.submission.score,
-                  value: payload.submission.result_value ?? null,
+                  expression: payload.submission!.expression,
+                  score: payload.submission!.score,
+                  value: payload.submission!.result_value ?? null,
                   timestamp: new Date().toISOString(),
                 },
                 ...prev[slot].history,
