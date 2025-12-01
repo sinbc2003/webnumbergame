@@ -8,14 +8,14 @@ from ..enums import TournamentStatus, RoundType
 
 class TournamentCreate(BaseModel):
     name: str
-    starts_at: datetime | None = None
+    participant_slots: int = Field(default=8, ge=4, le=32)
 
 
 class TournamentPublic(BaseModel):
     id: str
     name: str
     status: TournamentStatus
-    starts_at: datetime | None
+    participant_slots: int
     bracket: dict | None
     created_at: datetime
 

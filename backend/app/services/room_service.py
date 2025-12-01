@@ -29,7 +29,6 @@ class RoomService:
             description=payload.description,
             host_id=host.id,
             round_type=payload.round_type,
-            max_players=min(payload.max_players, settings.max_room_capacity),
             player_one_id=host.id,
         )
         self.session.add(room)
@@ -66,11 +65,6 @@ class RoomService:
         return result.scalar_one_or_none()
 
     async def join_room(self, *, room: Room, user: User, team_label: str | None = None) -> RoomParticipant:
-        count_stmt = select(func.count(RoomParticipant.id)).where(RoomParticipant.room_id == room.id)
-        current_count = (await self.session.execute(count_stmt)).scalar() or 0
-        if current_count >= room.max_players:
-            raise ValueError("방 정원이 가득 찼습니다.")
-
         active_match_stmt = (
             select(func.count(Match.id))
             .where(Match.room_id == room.id, Match.status == MatchStatus.ACTIVE)

@@ -15,7 +15,6 @@ export default function RoomForm({ onCreated }: Props) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<RoundType>("round1_individual");
-  const [maxPlayers, setMaxPlayers] = useState(16);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,8 +26,7 @@ export default function RoomForm({ onCreated }: Props) {
       const { data } = await api.post<Room>("/rooms", {
         name,
         description,
-        round_type: mode,
-        max_players: maxPlayers
+        round_type: mode
       });
       setStatusMessage("방이 생성되었습니다.");
       onCreated?.(data);
@@ -71,17 +69,6 @@ export default function RoomForm({ onCreated }: Props) {
           <option value="round1_individual">1라운드 개인전</option>
           <option value="round2_team">2라운드 팀전</option>
         </select>
-      </label>
-      <label className="block text-sm text-night-300">
-        최대 인원
-        <input
-          type="number"
-          min={2}
-          max={32}
-          value={maxPlayers}
-          onChange={(e) => setMaxPlayers(Number(e.target.value))}
-          className="mt-1 w-full rounded-lg border border-night-700 bg-night-950/70 p-2 text-white"
-        />
       </label>
       {statusMessage && <p className="text-sm text-night-300">{statusMessage}</p>}
       <button

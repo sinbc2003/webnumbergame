@@ -10,7 +10,6 @@ class RoomCreate(BaseModel):
     name: str
     description: str | None = None
     round_type: RoundType = RoundType.ROUND1_INDIVIDUAL
-    max_players: int = Field(default=16, ge=2, le=32)
 
 
 class RoomPublic(BaseModel):
@@ -21,7 +20,6 @@ class RoomPublic(BaseModel):
     host_id: str
     status: RoomStatus
     round_type: RoundType
-    max_players: int
     current_round: int
     player_one_id: str | None
     player_two_id: str | None

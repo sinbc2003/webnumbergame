@@ -39,7 +39,9 @@ export default async function TournamentPage() {
               className="block rounded-xl border border-night-800 bg-night-900/70 p-5 transition hover:border-night-600"
             >
               <p className="text-lg font-semibold text-white">{tournament.name}</p>
-              <p className="text-sm text-night-400">상태: {tournament.status}</p>
+              <p className="text-sm text-night-400">
+                상태: {tournament.status} · 참가 슬롯 {tournament.participant_slots}명
+              </p>
             </Link>
           ))}
           {tournaments.length === 0 && (

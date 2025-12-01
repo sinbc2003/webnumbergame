@@ -67,6 +67,7 @@ export interface Tournament {
   id: string;
   name: string;
   status: string;
+  participant_slots: number;
   created_at: string;
 }
 

@@ -18,7 +18,7 @@ class Tournament(SQLModel, table=True):
         default=None,
         sa_column=Column(JSON, nullable=True),
     )
-    starts_at: datetime | None = Field(default=None)
+    participant_slots: int = Field(default=8)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

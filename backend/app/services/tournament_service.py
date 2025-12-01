@@ -1,7 +1,6 @@
 import random
 import string
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,14 +18,6 @@ class TournamentBundle:
     matches: List[TournamentMatch]
 
 
-def _strip_timezone(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
-
-
 class TournamentService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -39,14 +30,14 @@ class TournamentService:
             name=payload.name,
             host_id=host.id,
             status=TournamentStatus.SEEDING,
-            starts_at=_strip_timezone(payload.starts_at),
+            participant_slots=payload.participant_slots,
         )
         self.session.add(tournament)
         await self.session.flush()
 
         slots = [
             TournamentSlot(tournament_id=tournament.id, position=index + 1)
-            for index in range(16)
+            for index in range(payload.participant_slots)
         ]
         self.session.add_all(slots)
 
@@ -106,7 +97,13 @@ class TournamentService:
             return existing
 
         matchups = []
-        round_sizes = [8, 4, 2, 1]
+        total_slots = tournament.participant_slots
+        rounds = 0
+        size = total_slots
+        while size >= 1:
+            size //= 2
+            rounds += 1
+        round_sizes = [total_slots // (2 ** round_idx) for round_idx in range(1, rounds + 1)]
         for round_index, size in enumerate(round_sizes, start=1):
             for matchup_index in range(size):
                 match = TournamentMatch(
