@@ -24,6 +24,11 @@ type RoomEventPayload = {
     score: number;
     result_value?: number | null;
     user_id?: string | null;
+    distance?: number | null;
+    cost?: number;
+    is_optimal?: boolean;
+    submitted_at?: string;
+    team_label?: string | null;
   };
 };
 
@@ -257,6 +262,17 @@ export default function RoomGamePanel({
     [armAudio, playTone],
   );
 
+  const participantLabel = useCallback(
+    (userId?: string) => {
+      if (!userId) return "대기 중";
+      const participant = participantState.find((p) => p.user_id === userId);
+      if (participant?.username) return participant.username;
+      if (participant?.user_id) return `참가자 ${participant.user_id.slice(0, 6)}…`;
+      return userId.slice(0, 6);
+    },
+    [participantState],
+  );
+
   useEffect(() => {
     if (!user) return;
     const ws = new WebSocket(wsUrl);
@@ -419,7 +435,7 @@ export default function RoomGamePanel({
       }
     };
     return () => ws.close();
-  }, [user, wsUrl, mutate, router]);
+  }, [user, wsUrl, mutate, router, participantLabel, playTone, triggerPreCountdown]);
 
   useEffect(() => {
     if (remaining === null) {
@@ -515,14 +531,6 @@ export default function RoomGamePanel({
       .toString()
       .padStart(2, "0");
     return `${minutes}:${seconds}`;
-  };
-
-  const participantLabel = (userId?: string) => {
-    if (!userId) return "대기 중";
-    const participant = participantState.find((p) => p.user_id === userId);
-    if (participant?.username) return participant.username;
-    if (participant?.user_id) return `참가자 ${participant.user_id.slice(0, 6)}…`;
-    return userId.slice(0, 6);
   };
 
   const activeMatch = data ?? null;
