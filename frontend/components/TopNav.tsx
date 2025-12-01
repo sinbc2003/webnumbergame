@@ -54,12 +54,20 @@ export default function TopNav() {
               로그아웃
             </button>
           ) : (
-            <Link
-              href="/login"
-              className="rounded-full border border-night-700 px-3 py-1 text-xs text-night-100 transition hover:border-night-500 hover:text-white"
-            >
-              로그인
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login"
+                className="rounded-full border border-night-700 px-3 py-1 text-xs text-night-100 transition hover:border-night-500 hover:text-white"
+              >
+                로그인
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-full border border-indigo-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-indigo-500"
+              >
+                회원가입
+              </Link>
+            </div>
           )}
         </nav>
       </div>

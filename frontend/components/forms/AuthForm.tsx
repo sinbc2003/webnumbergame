@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -186,6 +187,26 @@ export default function AuthForm({ mode }: Props) {
       >
         {loading ? "처리 중..." : isAdminMode ? "관리자 접속" : isRegisterMode ? "회원가입" : "로그인"}
       </button>
+      {!isAdminMode && (
+        <p className="text-center text-sm text-night-400">
+          {isRegisterMode ? (
+            <>
+              이미 계정이 있으신가요?{" "}
+              <Link href="/login" className="text-indigo-300 underline">
+                로그인하기
+              </Link>
+            </>
+          ) : (
+            <>
+              아직 계정이 없다면{" "}
+              <Link href="/register" className="text-indigo-300 underline">
+                회원가입
+              </Link>
+              을 진행해 주세요.
+            </>
+          )}
+        </p>
+      )}
     </form>
   );
 }

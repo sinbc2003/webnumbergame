@@ -191,13 +191,13 @@ useEffect(() => {
     }
   };
 
-  const handleAssign = async (slot: "player_one" | "player_two") => {
+  const handleAssign = async (slot: "player_one" | "player_two", userId: string) => {
     setAssigningSlot(slot);
     setError(null);
     try {
       await api.post(`/rooms/${roomId}/players`, {
         slot,
-        user_id: selectedPlayers[slot] || null,
+        user_id: userId || null,
       });
       setSuccess("플레이어 구성을 업데이트했습니다.");
     } catch (err: any) {
@@ -334,13 +334,16 @@ useEffect(() => {
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <select
                     value={selectedPlayers[slot as "player_one" | "player_two"]}
-                    onChange={(e) =>
+                    disabled={assigningSlot === slot}
+                    onChange={(e) => {
+                      const value = e.target.value;
                       setSelectedPlayers((prev) => ({
                         ...prev,
-                        [slot]: e.target.value,
-                      }))
-                    }
-                    className="flex-1 rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+                        [slot]: value,
+                      }));
+                      handleAssign(slot as "player_one" | "player_two", value);
+                    }}
+                    className="flex-1 rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
                   >
                     {options.map((option) => (
                       <option key={`${slot}-${option.value || "none"}`} value={option.value}>
@@ -348,14 +351,6 @@ useEffect(() => {
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => handleAssign(slot as "player_one" | "player_two")}
-                    disabled={assigningSlot === slot}
-                    className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
-                  >
-                    지정
-                  </button>
                 </div>
               )}
             </div>
