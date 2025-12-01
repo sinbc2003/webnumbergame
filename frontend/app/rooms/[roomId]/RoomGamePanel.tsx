@@ -60,6 +60,13 @@ interface BoardState {
   history: HistoryEntry[];
 }
 
+interface TeamMemberState {
+  name: string;
+  allocation: number;
+  remaining: number;
+  input: string;
+}
+
 type RoundOutcome = {
   reason: string;
   winnerId?: string | null;
@@ -75,6 +82,34 @@ const sanitizeExpression = (value: string) =>
     .join("");
 const INPUT_WARNING = "사용 가능한 기호는 1, +, *, (, ) 만 허용됩니다.";
 const CRITICAL_COUNTDOWN_THRESHOLD = 5;
+const TEAM_MEMBER_COUNT = 4;
+const TEAM_DEFAULT_ALLOCATION = [8, 8, 8, 8];
+const TEAM_MEMBER_LABELS = ["1번 주자", "2번 주자", "3번 주자", "4번 주자"];
+const TEAM_ALLOWED_SYMBOLS: Array<{ symbol: string; label: string }> = [
+  { symbol: "1", label: "1" },
+  { symbol: "(", label: "(" },
+  { symbol: ")", label: ")" },
+  { symbol: "+", label: "+" },
+  { symbol: "*", label: "*" },
+];
+const TEAM_COST_TABLE: Record<string, number> = {
+  "1": 1,
+  "+": 2,
+  "*": 3,
+  "(": 1,
+  ")": 1,
+};
+
+const createDefaultTeamMembers = (): TeamMemberState[] =>
+  TEAM_MEMBER_LABELS.map((name, index) => {
+    const allocation = TEAM_DEFAULT_ALLOCATION[index] ?? TEAM_DEFAULT_ALLOCATION[0];
+    return {
+      name,
+      allocation,
+      remaining: allocation,
+      input: "",
+    };
+  });
 
 interface Props {
   roomId: string;
@@ -102,6 +137,7 @@ export default function RoomGamePanel({
 }: Props) {
   const { user } = useAuth();
   const router = useRouter();
+  const isTeamRound = roundType === "round2_team";
   const [playerOne, setPlayerOne] = useState<string | undefined>(playerOneId ?? undefined);
   const [playerTwo, setPlayerTwo] = useState<string | undefined>(playerTwoId ?? undefined);
   const [boards, setBoards] = useState<{ playerOne: BoardState; playerTwo: BoardState }>({
@@ -558,6 +594,10 @@ export default function RoomGamePanel({
 
   const activeMatch = data ?? null;
   const hasActiveMatch = Boolean(activeMatch);
+const visibleSlots: BoardSlot[] =
+  hasActiveMatch && mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[]);
+  const isPlayerView = hasActiveMatch && Boolean(mySlot);
+  const visibleSlots: BoardSlot[] = isPlayerView && mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[]);
   const formattedRemaining = formatRemaining();
   const countdownPercent =
     initialRemaining && remaining !== null && initialRemaining > 0
@@ -571,9 +611,94 @@ export default function RoomGamePanel({
         return "hidden";
       })
     : [];
-  const containerClass = hasActiveMatch
-    ? "fixed inset-0 z-40 overflow-y-auto bg-night-950/95 p-6 space-y-4"
+  const containerClass = isPlayerView
+    ? "fixed inset-0 z-40 flex flex-col bg-night-950 px-4 py-6 text-white"
+    : hasActiveMatch
+      ? "fixed inset-0 z-40 overflow-y-auto bg-night-950/95 p-6 space-y-4"
     : "card space-y-4";
+
+  if (isPlayerView && activeMatch) {
+    return (
+      <div className={containerClass}>
+        <div className="grid gap-3 rounded-2xl border border-night-800 bg-night-900/40 p-4 text-sm text-night-200 sm:grid-cols-3">
+          <div>
+            <p className="text-night-500">현재 문제</p>
+            <p className="text-3xl font-bold text-white">{activeMatch.target_number}</p>
+            <p className="text-xs text-night-400">최적 코스트 {activeMatch.optimal_cost}</p>
+          </div>
+          <div>
+            <p className="text-night-500">남은 시간</p>
+            <p className={`text-3xl font-bold ${isCountdownCritical ? "text-red-400" : "text-indigo-300"}`}>
+              {formattedRemaining}
+            </p>
+            <div className="mt-2 h-2 w-full rounded-full bg-night-800">
+              <div
+                className={`h-full rounded-full ${isCountdownCritical ? "bg-red-500" : "bg-indigo-500"}`}
+                style={{ width: `${countdownPercent * 100}%` }}
+              />
+            </div>
+          </div>
+          <div>
+            <p className="text-night-500">문제 진행도</p>
+            <p className="text-2xl font-semibold text-night-100">
+              {activeMatch.current_index + 1} / {activeMatch.total_problems}
+            </p>
+            <p className="text-xs text-night-500">정답을 찾으면 즉시 다음 문제로 이동합니다.</p>
+          </div>
+        </div>
+        {statusMessage && <p className="text-sm text-green-400">{statusMessage}</p>}
+        {statusError && <p className="text-sm text-red-400">{statusError}</p>}
+        {preCountdown !== null && (
+          <div className="rounded-2xl border border-indigo-500/70 bg-night-900/60 p-6 text-center text-white">
+            <p className="text-sm text-night-400">라운드 시작 준비</p>
+            <p className="text-5xl font-bold text-indigo-200">{preCountdown}</p>
+          </div>
+        )}
+        <div className="flex flex-1 items-center justify-center overflow-hidden">
+          <div className="w-full max-w-4xl">
+            {visibleSlots.map((slot) => {
+              const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
+              const isMine = mySlot === slot;
+              if (isTeamRound && isMine) {
+                return (
+                  <TeamBoard
+                    key={slot}
+                    matchId={activeMatch.match_id}
+                    expression={boards[slot].expression}
+                    history={boards[slot].history}
+                    onExpressionChange={(value) => handleExpressionChange(slot, value)}
+                    onSubmit={() => submitExpression(slot)}
+                    submitting={submittingSlot === slot}
+                    disabled={!activeMatch || !assignedUser}
+                    playTone={playTone}
+                    armAudio={armAudio}
+                  />
+                );
+              }
+              return (
+                <PlayerPanel
+                  key={slot}
+                  title={slot === "playerOne" ? "플레이어 1" : "플레이어 2"}
+                  userLabel={participantLabel(assignedUser)}
+                  expression={boards[slot].expression}
+                  history={boards[slot].history}
+                  onExpressionChange={isMine ? (value) => handleExpressionChange(slot, value) : undefined}
+                  onSubmit={isMine ? () => submitExpression(slot) : undefined}
+                  onFocus={isMine ? armAudio : undefined}
+                  disabled={!activeMatch || !assignedUser}
+                  isMine={isMine}
+                  submitting={submittingSlot === slot}
+                  placeholder={slot === "playerOne" ? "예: (1+2)*3" : "예: (1+3)*2"}
+                  warningMessage={inputWarnings[slot]}
+                  focusLayout
+                />
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={containerClass}>
@@ -675,8 +800,8 @@ export default function RoomGamePanel({
             <p className="text-xs text-night-500">다음 문제는 공개되지 않으며, 현재 문제만 확인할 수 있습니다.</p>
           </div>
 
-          <div className={`grid gap-6 ${mySlot ? "" : "lg:grid-cols-2"}`}>
-            {(mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[])).map((slot) => {
+          <div className="grid gap-6 lg:grid-cols-2">
+            {visibleSlots.map((slot) => {
               const isMine = mySlot === slot;
               const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
               return (
@@ -701,6 +826,241 @@ export default function RoomGamePanel({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+interface TeamBoardProps {
+  matchId: string;
+  expression: string;
+  history: HistoryEntry[];
+  onExpressionChange: (value: string) => void;
+  onSubmit: () => void;
+  submitting: boolean;
+  disabled: boolean;
+  playTone: (type: "success" | "error" | "tick") => void;
+  armAudio: () => void;
+}
+
+function TeamBoard({
+  matchId,
+  expression,
+  history,
+  onExpressionChange,
+  onSubmit,
+  submitting,
+  disabled,
+  playTone,
+  armAudio,
+}: TeamBoardProps) {
+  const [members, setMembers] = useState<TeamMemberState[]>(() => createDefaultTeamMembers());
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const combined = useMemo(() => members.map((member) => member.input).join(""), [members]);
+  const activeMember = members[currentIndex];
+  const canEditAllocation = combined.length === 0;
+
+  useEffect(() => {
+    setMembers(createDefaultTeamMembers());
+    setCurrentIndex(0);
+    setMessage(null);
+    setError(null);
+    onExpressionChange("");
+  }, [matchId, onExpressionChange]);
+
+  useEffect(() => {
+    if (combined !== expression) {
+      onExpressionChange(combined);
+    }
+  }, [combined, expression, onExpressionChange]);
+
+  const updateMember = (index: number, updater: (member: TeamMemberState) => TeamMemberState) => {
+    setMembers((prev) => prev.map((member, idx) => (idx === index ? updater(member) : member)));
+  };
+
+  const handleAllocationChange = (index: number, value: number) => {
+    if (!canEditAllocation) return;
+    const sanitized = Math.max(0, Number.isFinite(value) ? value : 0);
+    updateMember(index, (member) => ({
+      ...member,
+      allocation: sanitized,
+      remaining: sanitized,
+      input: "",
+    }));
+  };
+
+  const handleCharInput = (symbol: string) => {
+    if (disabled) return;
+    armAudio();
+    setError(null);
+    const cost = TEAM_COST_TABLE[symbol] ?? 0;
+    if (activeMember.remaining < cost) {
+      setError("남은 코인이 부족합니다.");
+      playTone("error");
+      return;
+    }
+    updateMember(currentIndex, (member) => ({
+      ...member,
+      input: member.input + symbol,
+      remaining: member.remaining - cost,
+    }));
+  };
+
+  const handleDelete = () => {
+    if (disabled) return;
+    armAudio();
+    if (!activeMember.input) {
+      return;
+    }
+    const nextInput = activeMember.input.slice(0, -1);
+    const removed = activeMember.input.slice(-1);
+    const refund = TEAM_COST_TABLE[removed] ?? 0;
+    updateMember(currentIndex, (member) => ({
+      ...member,
+      input: nextInput,
+      remaining: member.remaining + refund,
+    }));
+  };
+
+  const handleNext = () => {
+    if (currentIndex >= TEAM_MEMBER_COUNT - 1) {
+      setMessage("모든 주자의 입력이 완료되었습니다. 필요하면 이전 주자를 선택해 조정하세요.");
+      return;
+    }
+    setCurrentIndex((prev) => prev + 1);
+    setMessage(`${TEAM_MEMBER_LABELS[currentIndex + 1]} 차례입니다.`);
+  };
+
+  const handlePrev = () => {
+    if (currentIndex === 0) return;
+    setCurrentIndex((prev) => prev - 1);
+    setMessage(`${TEAM_MEMBER_LABELS[currentIndex - 1]} 차례로 돌아갔습니다.`);
+  };
+
+  const handleReset = () => {
+    setMembers(createDefaultTeamMembers());
+    setCurrentIndex(0);
+    setMessage(null);
+    setError(null);
+  };
+
+  const handleSubmit = () => {
+    if (!combined.trim()) {
+      setError("식을 먼저 작성해 주세요.");
+      return;
+    }
+    onSubmit();
+  };
+
+  return (
+    <div className="rounded-2xl border-2 border-night-800 bg-night-950/50 p-6 text-night-100 shadow-lg">
+      <div className="grid gap-3 sm:grid-cols-4">
+        {members.map((member, index) => (
+          <div key={member.name} className="rounded-lg border border-night-800 bg-night-900/40 p-3 text-xs">
+            <p className="font-semibold text-white">{member.name}</p>
+            <div className="mt-1 flex items-center gap-2">
+              <label className="flex-1 text-night-500">
+                할당
+                <input
+                  type="number"
+                  min={0}
+                  value={member.allocation}
+                  disabled={!canEditAllocation}
+                  onChange={(e) => handleAllocationChange(index, Number(e.target.value))}
+                  className="mt-1 w-full rounded-md border border-night-800 bg-night-950 px-2 py-1 text-white focus:border-indigo-400 focus:outline-none"
+                />
+              </label>
+              <p className="w-16 text-right text-night-400">
+                남음 <span className="font-semibold text-white">{member.remaining}</span>
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 rounded-xl border border-night-800 bg-night-900/50 p-4 font-mono text-xl text-white">
+        <p className="text-xs text-night-500">현재 식</p>
+        <p className="mt-2 min-h-[64px] break-words text-2xl">{expression || "입력을 시작하세요."}</p>
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-[2fr,1fr]">
+        <div>
+          <div className="flex items-center justify-between text-sm text-night-400">
+            <p>
+              현재 차례: <span className="font-semibold text-white">{activeMember.name}</span>
+            </p>
+            <div className="space-x-2">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={currentIndex === 0}
+                className="rounded-md border border-night-700 px-3 py-1 text-xs text-night-200 disabled:opacity-40"
+              >
+                이전
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                className="rounded-md border border-night-700 px-3 py-1 text-xs text-night-200 disabled:opacity-40"
+              >
+                다음
+              </button>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-5 gap-2">
+            {TEAM_ALLOWED_SYMBOLS.map(({ symbol, label }) => (
+              <button
+                key={symbol}
+                type="button"
+                onClick={() => handleCharInput(symbol)}
+                className="rounded-lg border border-night-700 bg-night-900/70 py-3 text-lg font-semibold text-white hover:border-indigo-500"
+              >
+                {label}
+                <span className="block text-[10px] text-night-500">-{TEAM_COST_TABLE[symbol]} coin</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="rounded-lg border border-night-700 bg-night-900/70 py-3 text-sm font-semibold text-white hover:border-red-500"
+            >
+              ← 지우기
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="rounded-lg border border-night-700 bg-night-900/70 py-3 text-sm font-semibold text-white hover:border-amber-500"
+            >
+              전체 초기화
+            </button>
+          </div>
+          {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+          {message && <p className="mt-2 text-xs text-night-400">{message}</p>}
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={disabled || submitting || !expression.trim()}
+              className="flex-1 rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
+            >
+              {submitting ? "제출 중..." : "최종 제출"}
+            </button>
+          </div>
+        </div>
+        <div className="rounded-xl border border-night-800 bg-night-900/40 p-3 text-xs text-night-300">
+          <p className="text-sm font-semibold text-night-100">최근 기록</p>
+          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+            {history.length === 0 && <p className="text-night-500">아직 제출 기록이 없습니다.</p>}
+            {history.map((entry, index) => (
+              <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
+                <p className="font-semibold text-white">{entry.expression}</p>
+                <p className="text-[11px] text-night-400">
+                  점수 {entry.score} | 값 {entry.value ?? "-"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

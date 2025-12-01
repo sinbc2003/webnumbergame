@@ -431,7 +431,7 @@ async def submit_expression(
     }
     await manager.broadcast_room(room.id, event_payload)
 
-    if submission.distance == 0:
+    if submission.distance == 0 and submission.cost <= match.optimal_cost:
         metadata = match.metadata_snapshot or {}
         problems = metadata.get("problems") or []
         current_index = metadata.get("current_index", 0)

@@ -67,7 +67,6 @@ export interface Tournament {
   id: string;
   name: string;
   status: string;
-  starts_at?: string | null;
   created_at: string;
 }
 

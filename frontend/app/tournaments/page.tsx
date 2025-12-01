@@ -40,9 +40,6 @@ export default async function TournamentPage() {
             >
               <p className="text-lg font-semibold text-white">{tournament.name}</p>
               <p className="text-sm text-night-400">상태: {tournament.status}</p>
-              {tournament.starts_at && (
-                <p className="text-xs text-night-500">시작 예정: {new Date(tournament.starts_at).toLocaleString()}</p>
-              )}
             </Link>
           ))}
           {tournaments.length === 0 && (

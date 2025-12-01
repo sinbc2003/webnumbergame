@@ -9,7 +9,6 @@ import type { Tournament } from "@/types/api";
 export default function TournamentForm() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [startsAt, setStartsAt] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -19,8 +18,7 @@ export default function TournamentForm() {
     setMessage(null);
     try {
       const { data } = await api.post<Tournament>("/tournaments", {
-        name,
-        starts_at: startsAt ? new Date(startsAt).toISOString() : null
+        name
       });
       setMessage("토너먼트가 생성되었습니다.");
       router.push(`/tournaments/${data.id}`);
@@ -41,15 +39,6 @@ export default function TournamentForm() {
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-night-700 bg-night-950/70 p-2 text-white"
-        />
-      </label>
-      <label className="block text-sm text-night-300">
-        시작 일시 (선택)
-        <input
-          type="datetime-local"
-          value={startsAt}
-          onChange={(e) => setStartsAt(e.target.value)}
           className="mt-1 w-full rounded-lg border border-night-700 bg-night-950/70 p-2 text-white"
         />
       </label>
