@@ -144,9 +144,12 @@ export default function RoomGamePanel({
             break;
           }
           case "participant_joined": {
+            if (!payload.participant) break;
             setParticipantState((prev) => {
-              if (prev.some((p) => p.id === payload.participant.id)) return prev;
-              return [...prev, payload.participant];
+              if (prev.some((p) => p.id === payload.participant!.id)) {
+                return prev;
+              }
+              return [...prev, payload.participant!];
             });
             break;
           }
