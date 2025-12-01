@@ -432,41 +432,12 @@ async def submit_expression(
     await manager.broadcast_room(room.id, event_payload)
 
     if submission.distance == 0 and submission.cost <= match.optimal_cost:
-        metadata = match.metadata_snapshot or {}
-        problems = metadata.get("problems") or []
-        current_index = metadata.get("current_index", 0)
-        has_more = problems and current_index < len(problems) - 1
-
-        if has_more:
-            next_index = current_index + 1
-            next_problem = problems[next_index]
-            match.target_number = next_problem["target_number"]
-            match.optimal_cost = next_problem["optimal_cost"]
-            metadata["current_index"] = next_index
-            match.metadata_snapshot = metadata
-            session.add(match)
-            await session.commit()
-            await session.refresh(match)
-
-            await manager.broadcast_room(
-                room.id,
-                {
-                    "type": "problem_advanced",
-                    "room_id": room.id,
-                    "match_id": match.id,
-                    "current_index": next_index,
-                    "target_number": match.target_number,
-                    "optimal_cost": match.optimal_cost,
-                    "deadline": match.deadline.isoformat() if match.deadline else None,
-                },
-            )
-        else:
-            await game_service.close_match(match, submission.id)
-            await manager.broadcast_room(
-                room.id,
-                _round_finished_payload(room.id, match.id, submission, reason="optimal"),
-            )
-            return event_payload
+        await game_service.close_match(match, submission.id)
+        await manager.broadcast_room(
+            room.id,
+            _round_finished_payload(room.id, match.id, submission, reason="optimal"),
+        )
+        return event_payload
 
     await _maybe_finish_expired_match(game_service, room, match)
 
