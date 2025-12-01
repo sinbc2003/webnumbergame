@@ -12,12 +12,23 @@ interface AuthResponse {
   user: User;
 }
 
+interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+interface RegisterPayload {
+  email: string;
+  username: string;
+  password: string;
+}
+
 interface AuthState {
   user?: User;
   token?: string;
   loading: boolean;
-  login: (nickname: string) => Promise<void>;
-  register: (nickname: string) => Promise<void>;
+  login: (credentials: LoginPayload) => Promise<void>;
+  register: (payload: RegisterPayload) => Promise<void>;
   adminLogin: (username: string, password: string) => Promise<void>;
   logout: () => void;
   hydrate: () => void;
@@ -26,17 +37,6 @@ interface AuthState {
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => {
-      const enterAsGuest = async (nickname: string) => {
-        set({ loading: true });
-        try {
-          const { data } = await api.post<AuthResponse>("/auth/guest", { nickname });
-          setAuthToken(data.access_token);
-          set({ user: data.user, token: data.access_token });
-        } finally {
-          set({ loading: false });
-        }
-      };
-
       return {
         user: undefined,
         token: undefined,
@@ -45,8 +45,33 @@ export const useAuth = create<AuthState>()(
           const token = get().token ?? null;
           setAuthToken(token);
         },
-        login: async (nickname) => enterAsGuest(nickname),
-        register: async (nickname) => enterAsGuest(nickname),
+        login: async ({ email, password }) => {
+          set({ loading: true });
+          try {
+            const { data } = await api.post<AuthResponse>("/auth/login", {
+              email,
+              password,
+            });
+            setAuthToken(data.access_token);
+            set({ user: data.user, token: data.access_token });
+          } finally {
+            set({ loading: false });
+          }
+        },
+        register: async ({ email, username, password }) => {
+          set({ loading: true });
+          try {
+            const { data } = await api.post<AuthResponse>("/auth/register", {
+              email,
+              username,
+              password,
+            });
+            setAuthToken(data.access_token);
+            set({ user: data.user, token: data.access_token });
+          } finally {
+            set({ loading: false });
+          }
+        },
         adminLogin: async (username, password) => {
           set({ loading: true });
           try {
