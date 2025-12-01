@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -57,6 +57,7 @@ export default function RoomRealtimePanel({
     player_one: playerOneId ?? "",
     player_two: playerTwoId ?? "",
   });
+  const joinStateRef = useRef<{ userId?: string; joined: boolean }>({ joined: false });
 
   const { user } = useAuth();
   const router = useRouter();
@@ -76,8 +77,40 @@ export default function RoomRealtimePanel({
   }, [playerOneId, playerTwoId]);
 
   useEffect(() => {
-    setParticipantList(participants);
-  }, [participants]);
+    if (!user?.id || !roomCode) return;
+
+    if (participantList.some((p) => p.user_id === user.id)) {
+      joinStateRef.current = { userId: user.id, joined: true };
+      return;
+    }
+
+    if (joinStateRef.current.joined && joinStateRef.current.userId === user.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const attemptJoin = async () => {
+      joinStateRef.current = { userId: user.id, joined: true };
+      try {
+        await api.post("/rooms/join", {
+          code: roomCode,
+          team_label: null,
+        });
+        refreshParticipants();
+      } catch (err: any) {
+        if (cancelled) return;
+        joinStateRef.current = { userId: user.id, joined: false };
+        setError(err?.response?.data?.detail ?? "방 참가에 실패했습니다.");
+      }
+    };
+
+    attemptJoin();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, roomCode, participantList, refreshParticipants]);
 
   useEffect(() => {
     setParticipantList(participants);
