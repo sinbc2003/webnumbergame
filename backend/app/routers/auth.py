@@ -9,12 +9,14 @@ from sqlmodel import select
 from ..config import get_settings
 from ..database import get_session
 from ..models import User
-from ..schemas.auth import RegisterRequest, LoginRequest, GuestRequest, Token
+from ..schemas.auth import RegisterRequest, LoginRequest, GuestRequest, AdminLoginRequest, Token
 from ..schemas.user import UserPublic
 from ..security import create_access_token, get_password_hash, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
+ADMIN_USERNAME = "gshadmin2025"
+ADMIN_PASSWORD = "12345qwert!"
 
 
 @router.post("/register", response_model=Token)
@@ -99,6 +101,45 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(get_sessi
     user = result.scalar_one_or_none()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="이메일 또는 비밀번호가 올바르지 않습니다.")
+
+    expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
+    token_value = create_access_token(user.id, expires_delta)
+    return Token(
+        access_token=token_value,
+        expires_at=datetime.now(timezone.utc) + expires_delta,
+        user=UserPublic.model_validate(user),
+    )
+
+
+@router.post("/admin/login", response_model=Token)
+async def admin_login(payload: AdminLoginRequest, session: AsyncSession = Depends(get_session)):
+    if payload.username != ADMIN_USERNAME or payload.password != ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="관리자 자격 증명이 올바르지 않습니다.",
+        )
+
+    statement = select(User).where(User.username == ADMIN_USERNAME)
+    result = await session.execute(statement)
+    user = result.scalar_one_or_none()
+    hashed_password = get_password_hash(ADMIN_PASSWORD)
+
+    if not user:
+        user = User(
+            email=f"{ADMIN_USERNAME}@admin.local",
+            username=ADMIN_USERNAME,
+            hashed_password=hashed_password,
+            is_admin=True,
+        )
+    else:
+        user.is_admin = True
+        user.hashed_password = hashed_password
+        if not user.email:
+            user.email = f"{ADMIN_USERNAME}@admin.local"
+
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
 
     expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
     token_value = create_access_token(user.id, expires_delta)

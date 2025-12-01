@@ -18,6 +18,7 @@ interface AuthState {
   loading: boolean;
   login: (nickname: string) => Promise<void>;
   register: (nickname: string) => Promise<void>;
+  adminLogin: (username: string, password: string) => Promise<void>;
   logout: () => void;
   hydrate: () => void;
 }
@@ -46,6 +47,16 @@ export const useAuth = create<AuthState>()(
         },
         login: async (nickname) => enterAsGuest(nickname),
         register: async (nickname) => enterAsGuest(nickname),
+        adminLogin: async (username, password) => {
+          set({ loading: true });
+          try {
+            const { data } = await api.post<AuthResponse>("/auth/admin/login", { username, password });
+            setAuthToken(data.access_token);
+            set({ user: data.user, token: data.access_token });
+          } finally {
+            set({ loading: false });
+          }
+        },
         logout: () => {
           setAuthToken(null);
           set({ user: undefined, token: undefined });
