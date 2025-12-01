@@ -16,12 +16,17 @@ def _parse_cors_origins(value):
         if not stripped:
             return []
         if stripped.startswith("["):
+            # 1) 정상 JSON 배열이면 그대로 사용
             try:
                 loaded = json.loads(stripped)
                 if isinstance(loaded, list):
                     return loaded
             except json.JSONDecodeError:
-                pass
+                # 2) [] 만 둘러싸인 단일 문자열일 수 있으므로 괄호를 걷어낸 뒤 재가공
+                inner = stripped[1:-1].strip()
+                if not inner:
+                    return []
+                stripped = inner
         return [origin.strip() for origin in stripped.split(",") if origin.strip()]
     return value
 
