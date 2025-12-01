@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -9,7 +10,7 @@ from ..database import get_session
 from ..dependencies import get_current_user
 from ..enums import RoundType
 from ..events.manager import manager
-from ..models import Room, Submission, RoomParticipant, User
+from ..models import Problem, Room, RoomParticipant, Submission, User
 from ..schemas.room import (
     RoomCreate,
     RoomPublic,
@@ -17,6 +18,8 @@ from ..schemas.room import (
     StartRoundRequest,
     SubmissionRequest,
     ParticipantPublic,
+    ActiveMatchResponse,
+    ActiveMatchProblem,
 )
 from ..services.game_service import GameService
 from ..services.room_service import RoomService
@@ -104,13 +107,33 @@ async def start_round(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="방장만 라운드를 시작할 수 있습니다.")
 
     duration = payload.duration_minutes or settings.default_round_minutes
+    problem_count = payload.problem_count or 5
+
+    statement = (
+        select(Problem)
+        .where(Problem.round_type == room.round_type)
+        .order_by(func.random())
+        .limit(problem_count)
+    )
+    result = await session.execute(statement)
+    problems = result.scalars().all()
+    if not problems:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="등록된 문제가 없습니다. 관리자 페이지에서 문제를 추가하세요.")
+
+    serialized = [
+        {"target_number": problem.target_number, "optimal_cost": problem.optimal_cost} for problem in problems
+    ]
+    first = serialized[0]
+    metadata = {"problems": serialized, "current_index": 0}
+
     game_service = GameService(session)
     match = await game_service.create_match(
         room=room,
-        target_number=payload.target_number,
-        optimal_cost=payload.optimal_cost,
+        target_number=first["target_number"],
+        optimal_cost=first["optimal_cost"],
         round_number=payload.round_number,
         duration_minutes=duration,
+        metadata=metadata,
     )
 
     event_payload = {
@@ -120,6 +143,8 @@ async def start_round(
         "target_number": match.target_number,
         "optimal_cost": match.optimal_cost,
         "deadline": match.deadline.isoformat() if match.deadline else None,
+        "problems": serialized,
+        "current_index": 0,
     }
     await manager.broadcast_room(room.id, event_payload)
     return event_payload
@@ -171,16 +196,81 @@ async def submit_expression(
     await manager.broadcast_room(room.id, event_payload)
 
     if submission.distance == 0:
-        await game_service.close_match(match, submission.id)
-        await manager.broadcast_room(
-            room.id,
-            {
-                "type": "round_finished",
-                "room_id": room.id,
-                "match_id": match.id,
-                "winner_submission_id": submission.id,
-            },
-        )
+        metadata = match.metadata_snapshot or {}
+        problems = metadata.get("problems") or []
+        current_index = metadata.get("current_index", 0)
+        has_more = problems and current_index < len(problems) - 1
+
+        if has_more:
+            next_index = current_index + 1
+            next_problem = problems[next_index]
+            match.target_number = next_problem["target_number"]
+            match.optimal_cost = next_problem["optimal_cost"]
+            metadata["current_index"] = next_index
+            match.metadata_snapshot = metadata
+            session.add(match)
+            await session.commit()
+            await session.refresh(match)
+
+            await manager.broadcast_room(
+                room.id,
+                {
+                    "type": "problem_advanced",
+                    "room_id": room.id,
+                    "match_id": match.id,
+                    "current_index": next_index,
+                    "target_number": match.target_number,
+                    "optimal_cost": match.optimal_cost,
+                    "deadline": match.deadline.isoformat() if match.deadline else None,
+                },
+            )
+        else:
+            await game_service.close_match(match, submission.id)
+            await manager.broadcast_room(
+                room.id,
+                {
+                    "type": "round_finished",
+                    "room_id": room.id,
+                    "match_id": match.id,
+                    "winner_submission_id": submission.id,
+                },
+            )
 
     return event_payload
+
+
+def _build_active_match_response(match) -> ActiveMatchResponse:
+    metadata = match.metadata_snapshot or {}
+    stored_problems = metadata.get("problems") or []
+    problems = stored_problems or [
+        {"target_number": match.target_number, "optimal_cost": match.optimal_cost}
+    ]
+    current_index = metadata.get("current_index", 0)
+    mapped = [
+        ActiveMatchProblem(
+            target_number=item["target_number"],
+            optimal_cost=item["optimal_cost"],
+            index=index,
+        )
+        for index, item in enumerate(problems)
+    ]
+    return ActiveMatchResponse(
+        match_id=match.id,
+        round_number=match.round_number,
+        target_number=match.target_number,
+        optimal_cost=match.optimal_cost,
+        deadline=match.deadline,
+        current_index=current_index,
+        total_problems=len(mapped),
+        problems=mapped,
+    )
+
+
+@router.get("/{room_id}/active-match", response_model=ActiveMatchResponse | None)
+async def get_active_match(room_id: str, session: AsyncSession = Depends(get_session)):
+    service = GameService(session)
+    match = await service.get_active_match(room_id)
+    if not match:
+        return None
+    return _build_active_match_response(match)
 

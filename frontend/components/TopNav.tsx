@@ -6,8 +6,8 @@ import clsx from "clsx";
 
 import { useAuth } from "@/hooks/useAuth";
 
-const links = [
-  { href: "/", label: "대시보드" },
+const baseLinks = [
+  { href: "/dashboard", label: "대시보드" },
   { href: "/rooms", label: "게임방" },
   { href: "/tournaments", label: "토너먼트" }
 ];
@@ -21,6 +21,11 @@ export default function TopNav() {
     logout();
     router.push("/login");
   };
+
+  const links = [...baseLinks];
+  if (user?.is_admin) {
+    links.push({ href: "/admin", label: "관리자" });
+  }
 
   return (
     <header className="sticky top-0 z-30 bg-night-950/80 backdrop-blur border-b border-night-800">

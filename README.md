@@ -48,6 +48,7 @@ NEXT_PUBLIC_WS_BASE=ws://localhost:8000
 - 숫자식 파서/코스트 계산(기존 exe 의 `calculator.py` 이식)
 - 16강 토너먼트 시드 배정/브래킷 API 및 대회 화면
 - 대시보드 요약/랭킹 + 실시간 접속자 스트림
+- 관리자 페이지(`/admin`)에서 문제 데이터 CRUD 및 전체 초기화 가능
 
 ## GCP Cloud Run 배포 가이드
 

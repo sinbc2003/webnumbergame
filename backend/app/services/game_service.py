@@ -22,6 +22,7 @@ class GameService:
         optimal_cost: int,
         round_number: int,
         duration_minutes: int,
+        metadata: dict | None = None,
     ) -> Match:
         deadline = datetime.utcnow() + timedelta(minutes=duration_minutes)
         match = Match(
@@ -33,6 +34,7 @@ class GameService:
             started_at=datetime.utcnow(),
             deadline=deadline,
             round_number=round_number,
+            metadata_snapshot=metadata,
         )
         self.session.add(match)
         await self.session.commit()

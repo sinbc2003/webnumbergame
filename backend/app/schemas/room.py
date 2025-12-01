@@ -47,10 +47,9 @@ class JoinRoomRequest(BaseModel):
 
 
 class StartRoundRequest(BaseModel):
-    target_number: int
-    optimal_cost: int
     round_number: int = 1
     duration_minutes: int | None = None
+    problem_count: int = Field(default=5, ge=1, le=10)
 
 
 class SubmissionRequest(BaseModel):
@@ -70,4 +69,21 @@ class TeamSetupRequest(BaseModel):
     label: str
     total_budget: int
     members: List[TeamMemberInput]
+
+
+class ActiveMatchProblem(BaseModel):
+    target_number: int
+    optimal_cost: int
+    index: int
+
+
+class ActiveMatchResponse(BaseModel):
+    match_id: str
+    round_number: int
+    target_number: int
+    optimal_cost: int
+    deadline: datetime | None
+    current_index: int
+    total_problems: int
+    problems: List[ActiveMatchProblem]
 

@@ -4,6 +4,7 @@ from .match import Match, RoundSnapshot
 from .submission import Submission
 from .team import Team, TeamMember
 from .tournament import Tournament, TournamentSlot, TournamentMatch
+from .problem import Problem
 
 __all__ = [
     "User",
@@ -17,5 +18,6 @@ __all__ = [
     "Tournament",
     "TournamentSlot",
     "TournamentMatch",
+    "Problem",
 ]
 

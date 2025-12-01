@@ -81,3 +81,32 @@ export interface TournamentBundle {
   matches: TournamentMatch[];
 }
 
+export interface Problem {
+  id: string;
+  round_type: RoundType;
+  target_number: number;
+  optimal_cost: number;
+  created_at: string;
+}
+
+export interface ResetSummary {
+  deleted: Record<string, number>;
+}
+
+export interface ActiveMatchProblem {
+  target_number: number;
+  optimal_cost: number;
+  index: number;
+}
+
+export interface ActiveMatch {
+  match_id: string;
+  round_number: number;
+  target_number: number;
+  optimal_cost: number;
+  deadline?: string | null;
+  current_index: number;
+  total_problems: number;
+  problems: ActiveMatchProblem[];
+}
+

@@ -25,4 +25,9 @@ DB_INIT_MAX_RETRIES=5
 DB_INIT_RETRY_INTERVAL_SECONDS=2
 ``` 
 
+### 관리자 엔드포인트
+- `/api/admin/problems` (GET/POST/PUT/DELETE): 라운드별 문제 데이터 CRUD
+- `/api/admin/reset` (POST): 방/매치/토너먼트 등 테스트 데이터를 일괄 삭제
+- 모든 엔드포인트는 `is_admin=True` 인 사용자에게만 허용됩니다.
+
 Cloud Run 배포 시 `poetry export`로 requirements.txt를 생성하거나 Dockerfile에서 직접 poetry를 사용하면 됩니다.  11 

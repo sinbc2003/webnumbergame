@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .database import init_db
 from .events.manager import manager
-from .routers import auth, users, rooms, tournaments, dashboard
+from .routers import auth, users, rooms, tournaments, dashboard, admin
 
 settings = get_settings()
 
@@ -33,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(rooms.router, prefix=settings.api_prefix)
     app.include_router(tournaments.router, prefix=settings.api_prefix)
     app.include_router(dashboard.router, prefix=settings.api_prefix)
+    app.include_router(admin.router, prefix=settings.api_prefix)
 
     @app.get("/healthz")
     async def healthcheck():

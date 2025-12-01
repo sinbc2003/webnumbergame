@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import RoomRealtimePanel from "./RoomRealtimePanel";
+import RoomGamePanel from "./RoomGamePanel";
 import TopNav from "@/components/TopNav";
 import type { Participant, Room } from "@/types/api";
 
@@ -78,6 +79,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
               {participants.length === 0 && <p className="text-sm text-night-500">아직 참가자가 없습니다.</p>}
             </div>
           </div>
+          <RoomGamePanel roomId={room.id} roundType={room.round_type} />
         </section>
         <section>
           <RoomRealtimePanel

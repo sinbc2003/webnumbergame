@@ -33,10 +33,9 @@ export default function RoomRealtimePanel({ roomId, roomCode, hostId, currentRou
   const { user } = useAuth();
   const isHost = user?.id === hostId;
 
-  const [targetNumber, setTargetNumber] = useState(100);
-  const [optimalCost, setOptimalCost] = useState(10);
   const [roundNumber, setRoundNumber] = useState(currentRound);
   const [durationMinutes, setDurationMinutes] = useState(3);
+  const [problemCount, setProblemCount] = useState(5);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -65,12 +64,11 @@ export default function RoomRealtimePanel({ roomId, roomCode, hostId, currentRou
     setSuccess(null);
     try {
       await api.post(`/rooms/${roomId}/rounds`, {
-        target_number: Number(targetNumber),
-        optimal_cost: Number(optimalCost),
         round_number: Number(roundNumber),
         duration_minutes: durationMinutes ? Number(durationMinutes) : undefined,
+        problem_count: Number(problemCount),
       });
-      setSuccess("라운드를 시작했습니다. 참가자 화면을 확인하세요.");
+      setSuccess("등록된 문제에서 무작위로 라운드를 시작했습니다.");
     } catch (err: any) {
       const detail = err?.response?.data?.detail ?? "라운드 시작에 실패했습니다.";
       setError(detail);
@@ -87,33 +85,14 @@ export default function RoomRealtimePanel({ roomId, roomCode, hostId, currentRou
       </div>
 
       {isHost ? (
-        <form onSubmit={handleStartRound} className="space-y-3 rounded-lg border border-night-800 bg-night-950/50 p-4 text-sm text-night-200">
-          <p className="text-night-300">방장만 라운드를 시작할 수 있습니다.</p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1 text-night-400">
-              <span>목표 숫자</span>
-              <input
-                type="number"
-                min={1}
-                max={999}
-                value={targetNumber}
-                onChange={(e) => setTargetNumber(Number(e.target.value))}
-                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
-                required
-              />
-            </label>
-            <label className="space-y-1 text-night-400">
-              <span>최적 코스트</span>
-              <input
-                type="number"
-                min={1}
-                max={999}
-                value={optimalCost}
-                onChange={(e) => setOptimalCost(Number(e.target.value))}
-                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
-                required
-              />
-            </label>
+        <form
+          onSubmit={handleStartRound}
+          className="space-y-3 rounded-lg border border-night-800 bg-night-950/50 p-4 text-sm text-night-200"
+        >
+          <p className="text-night-300">
+            방장만 라운드를 시작할 수 있습니다. 목표 숫자는 관리자 페이지에서 등록한 문제 중 무작위로 선택됩니다.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="space-y-1 text-night-400">
               <span>라운드 번호</span>
               <input
@@ -134,6 +113,17 @@ export default function RoomRealtimePanel({ roomId, roomCode, hostId, currentRou
                 max={30}
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+              />
+            </label>
+            <label className="space-y-1 text-night-400">
+              <span>문제 개수</span>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={problemCount}
+                onChange={(e) => setProblemCount(Number(e.target.value))}
                 className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
               />
             </label>
