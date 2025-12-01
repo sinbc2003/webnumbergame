@@ -38,6 +38,21 @@ async def create_tournament(
     return TournamentPublic.model_validate(tournament)
 
 
+@router.post("/{tournament_id}/join", response_model=TournamentPublic)
+async def join_tournament(
+    tournament_id: str,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    tournament = await _get_tournament_or_404(session, tournament_id)
+    service = TournamentService(session)
+    try:
+        updated = await service.join(tournament=tournament, user=current_user)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return TournamentPublic.model_validate(updated)
+
+
 @router.get("", response_model=list[TournamentPublic])
 async def list_tournaments(session: AsyncSession = Depends(get_session)):
     statement = select(Tournament).order_by(Tournament.created_at.desc())

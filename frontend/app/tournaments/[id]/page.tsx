@@ -3,6 +3,7 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import Bracket from "@/components/tournament/Bracket";
 import type { TournamentBundle } from "@/types/api";
+import TournamentActions from "./TournamentActions";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000/api";
 
@@ -33,22 +34,32 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
     );
   }
 
-  const bracketSlots = bundle.slots.map((slot) => ({
-    round: Math.ceil(slot.position / 2),
-    index: slot.position,
-    label: `시드 ${slot.seed ?? slot.position}`,
-    team: slot.team_label ?? slot.user_id ?? "-"
+  const formatPlayer = (userId?: string | null) => {
+    if (!userId) return "대기 중";
+    return `플레이어 ${userId.slice(0, 6)}…`;
+  };
+
+  const bracketMatches = bundle.matches.map((match) => ({
+    id: match.id,
+    round: match.round_index,
+    matchup: match.matchup_index,
+    playerOne: formatPlayer(match.player_one_id),
+    playerTwo: formatPlayer(match.player_two_id),
+    roomId: match.room_id ?? undefined
   }));
 
   return (
     <div>
       <TopNav />
       <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
-        <div className="card">
-          <h1 className="text-2xl font-semibold text-white">{bundle.tournament.name}</h1>
-          <p className="text-sm text-night-400">상태: {bundle.tournament.status}</p>
+        <div className="card space-y-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">{bundle.tournament.name}</h1>
+            <p className="text-sm text-night-400">상태: {bundle.tournament.status}</p>
+          </div>
+          <TournamentActions tournamentId={bundle.tournament.id} slots={bundle.slots} />
         </div>
-        <Bracket slots={bracketSlots} />
+        <Bracket matches={bracketMatches} />
       </main>
     </div>
   );

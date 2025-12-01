@@ -78,6 +78,8 @@ export interface TournamentMatch {
   matchup_index: number;
   round_type: RoundType;
   room_id?: string | null;
+  player_one_id?: string | null;
+  player_two_id?: string | null;
 }
 
 export interface TournamentBundle {

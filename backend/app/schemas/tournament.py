@@ -40,6 +40,8 @@ class TournamentMatchPublic(BaseModel):
     matchup_index: int
     round_type: RoundType
     room_id: str | None = None
+    player_one_id: str | None = None
+    player_two_id: str | None = None
 
     class Config:
         from_attributes = True

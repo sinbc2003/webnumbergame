@@ -43,5 +43,7 @@ class TournamentMatch(SQLModel, table=True):
     room_id: str | None = Field(default=None, foreign_key="rooms.id")
     round_type: RoundType = Field(default=RoundType.ROUND1_INDIVIDUAL)
     winner_slot: int | None = Field(default=None)
+    player_one_id: str | None = Field(default=None, foreign_key="users.id")
+    player_two_id: str | None = Field(default=None, foreign_key="users.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
