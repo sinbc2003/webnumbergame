@@ -10,6 +10,21 @@ import type { ActiveMatch, Participant, RoundType } from "@/types/api";
 
 type BoardSlot = "playerOne" | "playerTwo";
 
+type RoomEventPayload = {
+  type?: string;
+  player_one_id?: string | null;
+  player_two_id?: string | null;
+  participant?: Participant;
+  user_id?: string;
+  expression?: string;
+  submission?: {
+    expression: string;
+    score: number;
+    result_value?: number | null;
+    user_id?: string | null;
+  };
+};
+
 interface HistoryEntry {
   expression: string;
   score: number;
@@ -105,7 +120,7 @@ export default function RoomGamePanel({
     const ws = new WebSocket(wsUrl);
     ws.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data) as { type?: string };
+        const payload = JSON.parse(event.data) as RoomEventPayload;
         switch (payload.type) {
           case "player_assignment": {
             const nextOne = payload.player_one_id ?? undefined;

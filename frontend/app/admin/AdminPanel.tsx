@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
@@ -26,7 +26,7 @@ export default function AdminPanel() {
   const [success, setSuccess] = useState<string | null>(null);
   const [resetResult, setResetResult] = useState<ResetSummary | null>(null);
 
-  const fetchProblems = async () => {
+  const fetchProblems = useCallback(async () => {
     if (!user?.is_admin) return;
     setLoading(true);
     setError(null);
@@ -38,11 +38,11 @@ export default function AdminPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.is_admin]);
 
   useEffect(() => {
     fetchProblems();
-  }, [user?.is_admin]);
+  }, [fetchProblems]);
 
   if (!user) {
     return <p className="text-night-300">로그인이 필요합니다.</p>;
