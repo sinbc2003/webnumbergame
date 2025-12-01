@@ -618,11 +618,11 @@ export default function RoomGamePanel({
   if (isPlayerView && activeMatch) {
     return (
       <div className={containerClass}>
-        <div className="grid gap-3 rounded-2xl border border-night-800 bg-night-900/40 p-4 text-sm text-night-200 sm:grid-cols-3">
+        <div className="grid gap-3 rounded-2xl border-2 border-amber-400/60 bg-night-900/60 p-5 text-sm text-night-200 sm:grid-cols-3">
           <div>
-            <p className="text-night-500">현재 문제</p>
-            <p className="text-3xl font-bold text-white">{activeMatch.target_number}</p>
-            <p className="text-xs text-night-400">최적 코스트 {activeMatch.optimal_cost}</p>
+            <p className="text-amber-400 text-sm font-semibold">현재 문제</p>
+            <p className="text-5xl font-black text-amber-300 drop-shadow-lg">{activeMatch.target_number}</p>
+            <p className="mt-1 text-xs text-amber-200/80">지금 풀어야 할 목표 숫자</p>
           </div>
           <div>
             <p className="text-night-500">남은 시간</p>
@@ -637,11 +637,9 @@ export default function RoomGamePanel({
             </div>
           </div>
           <div>
-            <p className="text-night-500">문제 진행도</p>
-            <p className="text-2xl font-semibold text-night-100">
-              {activeMatch.current_index + 1} / {activeMatch.total_problems}
-            </p>
-            <p className="text-xs text-night-500">정답을 찾으면 즉시 다음 문제로 이동합니다.</p>
+            <p className="text-amber-400 text-sm font-semibold">최적 코스트</p>
+            <p className="text-4xl font-extrabold text-amber-200">{activeMatch.optimal_cost}</p>
+            <p className="text-xs text-amber-200/80">이 코스트 이하로 정답을 만들면 즉시 승리</p>
           </div>
         </div>
         {statusMessage && <p className="text-sm text-green-400">{statusMessage}</p>}
@@ -652,7 +650,7 @@ export default function RoomGamePanel({
             <p className="text-5xl font-bold text-indigo-200">{preCountdown}</p>
           </div>
         )}
-        <div className="flex flex-1 items-center justify-center overflow-hidden">
+        <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-4xl">
             {visibleSlots.map((slot) => {
               const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
@@ -1022,20 +1020,21 @@ function TeamBoard({
             </button>
           </div>
         </div>
-        <div className="rounded-xl border border-night-800 bg-night-900/40 p-3 text-xs text-night-300">
-          <p className="text-sm font-semibold text-night-100">최근 기록</p>
-          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
-            {history.length === 0 && <p className="text-night-500">아직 제출 기록이 없습니다.</p>}
-            {history.map((entry, index) => (
-              <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
-                <p className="font-semibold text-white">{entry.expression}</p>
-                <p className="text-[11px] text-night-400">
-                  점수 {entry.score} | 값 {entry.value ?? "-"}
-                </p>
-              </div>
-            ))}
+        {history.length > 0 && (
+          <div className="rounded-xl border border-night-800 bg-night-900/40 p-3 text-xs text-night-300">
+            <p className="text-sm font-semibold text-night-100">최근 기록</p>
+            <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+              {history.map((entry, index) => (
+                <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
+                  <p className="font-semibold text-white">{entry.expression}</p>
+                  <p className="text-[11px] text-night-400">
+                    점수 {entry.score} | 값 {entry.value ?? "-"}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
