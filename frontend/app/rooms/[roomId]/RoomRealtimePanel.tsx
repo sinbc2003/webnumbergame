@@ -77,42 +77,6 @@ export default function RoomRealtimePanel({
   }, [playerOneId, playerTwoId]);
 
   useEffect(() => {
-    if (!user?.id || !roomCode) return;
-
-    if (participantList.some((p) => p.user_id === user.id)) {
-      joinStateRef.current = { userId: user.id, joined: true };
-      return;
-    }
-
-    if (joinStateRef.current.joined && joinStateRef.current.userId === user.id) {
-      return;
-    }
-
-    let cancelled = false;
-
-    const attemptJoin = async () => {
-      joinStateRef.current = { userId: user.id, joined: true };
-      try {
-        await api.post("/rooms/join", {
-          code: roomCode,
-          team_label: null,
-        });
-        refreshParticipants();
-      } catch (err: any) {
-        if (cancelled) return;
-        joinStateRef.current = { userId: user.id, joined: false };
-        setError(err?.response?.data?.detail ?? "방 참가에 실패했습니다.");
-      }
-    };
-
-    attemptJoin();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id, roomCode, participantList, refreshParticipants]);
-
-  useEffect(() => {
     setParticipantList(participants);
   }, [participants]);
 
@@ -133,6 +97,42 @@ export default function RoomRealtimePanel({
     const interval = setInterval(refreshParticipants, 5000);
     return () => clearInterval(interval);
   }, [refreshParticipants]);
+
+useEffect(() => {
+  if (!user?.id || !roomCode) return;
+
+  if (participantList.some((p) => p.user_id === user.id)) {
+    joinStateRef.current = { userId: user.id, joined: true };
+    return;
+  }
+
+  if (joinStateRef.current.joined && joinStateRef.current.userId === user.id) {
+    return;
+  }
+
+  let cancelled = false;
+
+  const attemptJoin = async () => {
+    joinStateRef.current = { userId: user.id, joined: true };
+    try {
+      await api.post("/rooms/join", {
+        code: roomCode,
+        team_label: null,
+      });
+      refreshParticipants();
+    } catch (err: any) {
+      if (cancelled) return;
+      joinStateRef.current = { userId: user.id, joined: false };
+      setError(err?.response?.data?.detail ?? "방 참가에 실패했습니다.");
+    }
+  };
+
+  attemptJoin();
+
+  return () => {
+    cancelled = true;
+  };
+}, [user?.id, roomCode, participantList, refreshParticipants]);
 
   useEffect(() => {
     const ws = new WebSocket(wsUrl);
