@@ -79,6 +79,10 @@ export default function RoomRealtimePanel({
     setParticipantList(participants);
   }, [participants]);
 
+  useEffect(() => {
+    setParticipantList(participants);
+  }, [participants]);
+
   const refreshParticipants = useCallback(async () => {
     try {
       const { data } = await api.get<Participant[]>(`/rooms/${roomId}/participants`);
@@ -90,6 +94,11 @@ export default function RoomRealtimePanel({
 
   useEffect(() => {
     refreshParticipants();
+  }, [refreshParticipants]);
+
+  useEffect(() => {
+    const interval = setInterval(refreshParticipants, 5000);
+    return () => clearInterval(interval);
   }, [refreshParticipants]);
 
   useEffect(() => {
@@ -187,6 +196,22 @@ export default function RoomRealtimePanel({
 
   const spectators = participantList.filter((p) => p.role !== "player");
 
+  const participantItems = participantList.map((participant) => {
+    const baseLabel = participant.user_id === hostId ? "방장" : participant.role === "player" ? "플레이어" : "관전자";
+    const slotLabel =
+      participant.user_id === playerOne
+        ? "플레이어 1"
+        : participant.user_id === playerTwo
+          ? "플레이어 2"
+          : null;
+    return {
+      ...participant,
+      label: displayName(participant),
+      roleLabel: slotLabel ?? baseLabel,
+      isHost: participant.user_id === hostId,
+    };
+  });
+
   const describeEvent = (event: EventMessage) => {
     switch (event.type) {
       case "player_assignment":
@@ -207,11 +232,37 @@ export default function RoomRealtimePanel({
   };
 
   return (
-    <div className="card space-y-4">
+      <div className="card space-y-4">
       <div>
         <p className="text-sm font-semibold text-night-200">참가 코드</p>
         <p className="text-2xl font-bold tracking-widest text-white">{roomCode}</p>
       </div>
+
+        <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-night-100">참여자 {participantItems.length}명</p>
+            <span className="text-xs text-night-500">방장/플레이어/관전자</span>
+          </div>
+          <div className="mt-3 space-y-2 text-sm">
+            {participantItems.length === 0 && <p className="text-night-500">아직 참가자가 없습니다.</p>}
+            {participantItems.map((participant) => (
+              <div
+                key={participant.id}
+                className="flex items-center justify-between rounded border border-night-900 bg-night-950/60 px-3 py-2"
+              >
+                <div>
+                  <p className="font-semibold text-white">{participant.label}</p>
+                  <p className="text-xs text-night-500">{participant.roleLabel}</p>
+                </div>
+                {participant.isHost && (
+                  <span className="rounded-full border border-amber-400 px-2 py-0.5 text-[10px] text-amber-300">
+                    호스트
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
       <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
         <div className="flex items-center justify-between">
