@@ -1,37 +1,38 @@
 import json
 import secrets
 from functools import lru_cache
-from typing import Annotated, List, Union
+from typing import List
 
-from pydantic import AnyHttpUrl, Field
-from pydantic.functional_validators import BeforeValidator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_CORS_ORIGINS = ["http://localhost:3000"]
 
-def _parse_cors_origins(value):
+
+def _parse_cors_origins(value: str | List[str] | None) -> List[str] | None:
     if value is None:
-        return value
-    if isinstance(value, str):
-        stripped = value.strip()
-        if not stripped:
-            return []
-        if stripped.startswith("[") and stripped.endswith("]"):
-            # 1) 정상 JSON 배열이면 그대로 사용
-            try:
-                loaded = json.loads(stripped)
-                if isinstance(loaded, list):
-                    return loaded
-            except json.JSONDecodeError:
-                # 2) [] 만 둘러싸인 단일 문자열일 수 있으므로 괄호를 제거
-                inner = stripped[1:-1].strip()
-                if not inner:
-                    return []
-                stripped = inner
-        return [origin.strip() for origin in stripped.split(",") if origin.strip()]
-    return value
+        return None
 
+    if isinstance(value, (list, tuple, set)):
+        return [str(origin).strip() for origin in value if str(origin).strip()]
 
-CorsOrigins = Annotated[List[Union[AnyHttpUrl, str]], BeforeValidator(_parse_cors_origins)]
+    stripped = str(value).strip()
+    if not stripped:
+        return []
+
+    if stripped.startswith("[") and stripped.endswith("]"):
+        try:
+            loaded = json.loads(stripped)
+        except json.JSONDecodeError:
+            inner = stripped[1:-1].strip()
+            if not inner:
+                return []
+            stripped = inner
+        else:
+            if isinstance(loaded, list):
+                return [str(origin).strip() for origin in loaded if str(origin).strip()]
+
+    return [origin.strip() for origin in stripped.split(",") if origin.strip()]
 
 
 class Settings(BaseSettings):
@@ -48,12 +49,19 @@ class Settings(BaseSettings):
     refresh_token_expire_minutes: int = 60 * 24 * 30
     database_url: str = "sqlite+aiosqlite:///./number_game.db"
     redis_url: str | None = None
-    cors_origins: CorsOrigins = ["http://localhost:3000"]
+    cors_origins_raw: str | None = Field(default=None, alias="CORS_ORIGINS")
     default_round_minutes: int = 3
     leaderboard_window_hours: int = 24
     max_room_capacity: int = 16
     db_init_max_retries: int = 5
     db_init_retry_interval_seconds: float = 2.0
+
+    @property
+    def cors_origins(self) -> List[str]:
+        parsed = _parse_cors_origins(self.cors_origins_raw)
+        if not parsed:
+            return DEFAULT_CORS_ORIGINS
+        return parsed
 
 
 @lru_cache
