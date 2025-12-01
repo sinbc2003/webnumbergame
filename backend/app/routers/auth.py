@@ -65,8 +65,9 @@ async def guest_login(payload: GuestRequest, session: AsyncSession = Depends(get
             stmt = select(User).where(User.username == candidate)
             existing = (await session.execute(stmt)).scalar_one_or_none()
             if existing is None:
+                guest_email = f"guest-{uuid4().hex}@guest.localhost"
                 user = User(
-                    email=f"guest-{uuid4().hex}@guest.local",
+                    email=guest_email,
                     username=candidate,
                     hashed_password=get_password_hash(secrets.token_hex(16)),
                 )
@@ -76,6 +77,11 @@ async def guest_login(payload: GuestRequest, session: AsyncSession = Depends(get
             else:
                 candidate = f"{normalized_username}{suffix}"
                 suffix += 1
+    elif user.email.endswith("@guest.local"):
+        user.email = user.email.replace("@guest.local", "@guest.localhost")
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
 
     expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
     token_value = create_access_token(user.id, expires_delta)
