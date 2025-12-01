@@ -7,7 +7,7 @@ FastAPI 백엔드와 Next.js 프론트엔드로 구현한 실시간 숫자게임
 ```
 backend/   # FastAPI + SQLModel + WebSocket
 frontend/  # Next.js 14(App Router) + Tailwind
-참고/        # 기존 데스크톱 버전 참고 자료
+참고/        # 기존 데스크톱 버전 참고 자료11
 ```
 
 ## 로컬 개발
