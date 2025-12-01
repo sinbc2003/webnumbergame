@@ -595,8 +595,6 @@ export default function RoomGamePanel({
   const activeMatch = data ?? null;
   const hasActiveMatch = Boolean(activeMatch);
   const isPlayerView = hasActiveMatch && Boolean(mySlot);
-  const visibleSlots: BoardSlot[] =
-    isPlayerView && mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[]);
   const visibleSlots: BoardSlot[] = isPlayerView && mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[]);
   const formattedRemaining = formatRemaining();
   const countdownPercent =
