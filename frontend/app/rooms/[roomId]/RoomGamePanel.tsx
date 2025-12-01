@@ -19,6 +19,8 @@ type RoomEventPayload = {
   participant?: Participant;
   user_id?: string;
   expression?: string;
+  reason?: string;
+  winner_submission_id?: string | null;
   submission?: {
     expression: string;
     score: number;
@@ -29,6 +31,20 @@ type RoomEventPayload = {
     is_optimal?: boolean;
     submitted_at?: string;
     team_label?: string | null;
+    match_id?: string;
+  };
+  winner_submission?: {
+    id: string;
+    match_id: string;
+    user_id?: string | null;
+    team_label?: string | null;
+    expression: string;
+    result_value?: number | null;
+    cost?: number;
+    distance?: number | null;
+    is_optimal?: boolean;
+    score: number;
+    submitted_at: string;
   };
 };
 
