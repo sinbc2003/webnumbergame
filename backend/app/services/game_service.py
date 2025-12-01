@@ -93,8 +93,6 @@ class GameService:
 
         if user:
             user.total_score += evaluation.score
-            if evaluation.distance == 0:
-                user.win_count += 1
             await self.session.flush()
 
         await self.session.commit()

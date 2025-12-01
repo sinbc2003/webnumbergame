@@ -8,7 +8,7 @@ from sqlmodel import select
 from ..config import get_settings
 from ..database import get_session
 from ..dependencies import get_current_user
-from ..enums import RoundType, ParticipantRole, MatchStatus
+from ..enums import RoundType, ParticipantRole, MatchStatus, RoomStatus
 from ..events.manager import manager
 from ..models import Match, Problem, Room, RoomParticipant, Submission, User
 from ..schemas.room import (
@@ -382,6 +382,7 @@ def _round_finished_payload(room_id: str, match_id: str, submission: Submission 
 
 
 async def _maybe_finish_expired_match(
+    session: AsyncSession,
     game_service: GameService,
     room: Room,
     match: Match,
@@ -399,6 +400,46 @@ async def _maybe_finish_expired_match(
     await manager.broadcast_room(
         room.id,
         _round_finished_payload(room.id, closed_match.id, best_submission, reason="timeout"),
+    )
+    await _finalize_room(session, room, closed_match, best_submission, reason="timeout")
+
+
+async def _finalize_room(
+    session: AsyncSession,
+    room: Room,
+    match: Match,
+    winning_submission: Submission | None,
+    reason: str,
+) -> None:
+    winner_id = winning_submission.user_id if winning_submission else None
+    participants = {room.player_one_id, room.player_two_id}
+    loser_id = None
+    if winner_id and winner_id in participants:
+        loser_id = next((pid for pid in participants if pid and pid != winner_id), None)
+
+    async def _increment(user_id: str | None, field: str) -> None:
+        if not user_id:
+            return
+        user = await session.get(User, user_id)
+        if not user:
+            return
+        setattr(user, field, getattr(user, field) + 1)
+        session.add(user)
+
+    await _increment(winner_id, "win_count")
+    await _increment(loser_id, "loss_count")
+
+    room.status = RoomStatus.ARCHIVED
+    session.add(room)
+    await session.commit()
+
+    await manager.broadcast_room(
+        room.id,
+        {
+            "type": "room_closed",
+            "room_id": room.id,
+            "reason": reason,
+        },
     )
 
 
@@ -437,9 +478,10 @@ async def submit_expression(
             room.id,
             _round_finished_payload(room.id, match.id, submission, reason="optimal"),
         )
+        await _finalize_room(session, room, match, submission, reason="optimal")
         return event_payload
 
-    await _maybe_finish_expired_match(game_service, room, match)
+    await _maybe_finish_expired_match(session, game_service, room, match)
 
     return event_payload
 
