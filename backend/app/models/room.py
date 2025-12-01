@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 from typing import Optional
 
@@ -21,8 +21,8 @@ class Room(SQLModel, table=True):
     max_players: int = Field(default=16)
     tournament_id: Optional[str] = Field(default=None, foreign_key="tournaments.id")
     expires_at: Optional[datetime] = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class RoomParticipant(SQLModel, table=True):
@@ -35,5 +35,5 @@ class RoomParticipant(SQLModel, table=True):
     is_ready: bool = Field(default=False)
     order_index: int | None = Field(default=None)
     score: int = Field(default=0)
-    joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 
 from sqlmodel import Field, SQLModel
@@ -16,6 +16,6 @@ class User(SQLModel, table=True):
     loss_count: int = Field(default=0)
     total_score: int = Field(default=0)
     is_admin: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 

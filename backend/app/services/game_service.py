@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,14 +23,14 @@ class GameService:
         round_number: int,
         duration_minutes: int,
     ) -> Match:
-        deadline = datetime.now(timezone.utc) + timedelta(minutes=duration_minutes)
+        deadline = datetime.utcnow() + timedelta(minutes=duration_minutes)
         match = Match(
             room_id=room.id,
             round_type=room.round_type,
             target_number=target_number,
             optimal_cost=optimal_cost,
             status=MatchStatus.ACTIVE,
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.utcnow(),
             deadline=deadline,
             round_number=round_number,
         )
@@ -90,7 +90,7 @@ class GameService:
 
     async def close_match(self, match: Match, winning_submission_id: str | None = None) -> Match:
         match.status = MatchStatus.CLOSED
-        match.finished_at = datetime.now(timezone.utc)
+        match.finished_at = datetime.utcnow()
         match.winning_submission_id = winning_submission_id
         self.session.add(match)
         await self.session.commit()

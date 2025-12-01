@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import Column, JSON
@@ -25,7 +25,7 @@ class Match(SQLModel, table=True):
         default=None,
         sa_column=Column(JSON, nullable=True),
     )
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class RoundSnapshot(SQLModel, table=True):
@@ -39,5 +39,5 @@ class RoundSnapshot(SQLModel, table=True):
     match_id: str = Field(foreign_key="matches.id", index=True)
     team_label: str | None = Field(default=None)
     composed_expression: str = Field(default="")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 

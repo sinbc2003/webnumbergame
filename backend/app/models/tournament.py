@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import Column, JSON
@@ -19,7 +19,7 @@ class Tournament(SQLModel, table=True):
         sa_column=Column(JSON, nullable=True),
     )
     starts_at: datetime | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class TournamentSlot(SQLModel, table=True):
@@ -43,5 +43,5 @@ class TournamentMatch(SQLModel, table=True):
     room_id: str | None = Field(default=None, foreign_key="rooms.id")
     round_type: RoundType = Field(default=RoundType.ROUND1_INDIVIDUAL)
     winner_slot: int | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from .calculator import analyze_input
@@ -40,7 +40,7 @@ class NumberGameEngine:
         total_cost = analysis["total_cost"]
         remaining_seconds = 0
         if deadline:
-            remaining_seconds = max(0, int((deadline - datetime.now(timezone.utc)).total_seconds()))
+            remaining_seconds = max(0, int((deadline - datetime.utcnow()).total_seconds()))
 
         score_bundle: SubmissionScore = compute_score(
             target_number=target_number,

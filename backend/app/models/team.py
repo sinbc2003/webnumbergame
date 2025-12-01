@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 
 from sqlmodel import Field, SQLModel
@@ -12,7 +12,7 @@ class Team(SQLModel, table=True):
     name: str
     label: str
     total_budget: int = Field(default=0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class TeamMember(SQLModel, table=True):
@@ -23,5 +23,5 @@ class TeamMember(SQLModel, table=True):
     user_id: str = Field(foreign_key="users.id", index=True)
     order_index: int = Field(default=0)
     allocated_budget: int = Field(default=0)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 

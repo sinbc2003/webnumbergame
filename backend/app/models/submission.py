@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import uuid4
 
 from sqlmodel import Field, SQLModel
@@ -17,6 +17,6 @@ class Submission(SQLModel, table=True):
     distance: float | None = Field(default=None)
     is_optimal: bool = Field(default=False)
     score: int = Field(default=0)
-    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    submitted_at: datetime = Field(default_factory=datetime.utcnow)
     submitted_round: int = Field(default=1)
 
