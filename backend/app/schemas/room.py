@@ -34,6 +34,7 @@ class RoomPublic(BaseModel):
 class ParticipantPublic(BaseModel):
     id: str
     user_id: str
+    username: str
     team_label: str | None
     is_ready: bool
     order_index: int | None

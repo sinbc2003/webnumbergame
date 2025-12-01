@@ -33,6 +33,7 @@ export interface Room {
 export interface Participant {
   id: string;
   user_id: string;
+  username: string;
   team_label?: string | null;
   is_ready: boolean;
   order_index?: number | null;

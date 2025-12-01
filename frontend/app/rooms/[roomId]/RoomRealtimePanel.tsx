@@ -161,9 +161,16 @@ export default function RoomRealtimePanel({
     }
   };
 
+  const displayName = (participant?: Participant, fallbackId?: string) => {
+    if (participant?.username) return participant.username;
+    if (participant?.user_id) return `참가자 ${participant.user_id.slice(0, 6)}…`;
+    if (fallbackId) return `참가자 ${fallbackId.slice(0, 6)}…`;
+    return "비어 있음";
+  };
+
   const options = [{ label: "비워두기", value: "" }].concat(
     participantList.map((p) => ({
-      label: `참가자 ${p.user_id.slice(0, 6)}…`,
+      label: displayName(p),
       value: p.user_id,
     })),
   );
@@ -171,7 +178,7 @@ export default function RoomRealtimePanel({
   const playerLabel = (userId?: string) => {
     if (!userId) return "비어 있음";
     const participant = participantList.find((p) => p.user_id === userId);
-    return participant ? `참가자 ${participant.user_id.slice(0, 6)}…` : userId.slice(0, 6);
+    return displayName(participant, userId);
   };
 
   const spectators = participantList.filter((p) => p.role !== "player");
@@ -314,7 +321,7 @@ export default function RoomRealtimePanel({
         <div className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-night-400">
           {spectators.length === 0 && <p>아직 관전자가 없습니다.</p>}
           {spectators.map((spectator) => (
-            <p key={spectator.id}>• {spectator.user_id.slice(0, 8)}…</p>
+            <p key={spectator.id}>• {displayName(spectator)}</p>
           ))}
         </div>
       </div>

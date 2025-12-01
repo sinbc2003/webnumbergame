@@ -304,7 +304,9 @@ export default function RoomGamePanel({
   const participantLabel = (userId?: string) => {
     if (!userId) return "대기 중";
     const participant = participantState.find((p) => p.user_id === userId);
-    return participant ? `참가자 ${participant.user_id.slice(0, 6)}…` : userId.slice(0, 6);
+    if (participant?.username) return participant.username;
+    if (participant?.user_id) return `참가자 ${participant.user_id.slice(0, 6)}…`;
+    return userId.slice(0, 6);
   };
 
   const activeMatch = data ?? null;

@@ -30,6 +30,12 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 settings = get_settings()
 
 
+def _participant_to_public(participant: RoomParticipant, username: str) -> ParticipantPublic:
+    payload = participant.model_dump()
+    payload["username"] = username
+    return ParticipantPublic.model_validate(payload)
+
+
 @router.delete("/{room_id}/participants/me", status_code=status.HTTP_204_NO_CONTENT)
 async def leave_room(
     room_id: str,
@@ -142,10 +148,14 @@ async def get_room(room_id: str, session: AsyncSession = Depends(get_session)):
 @router.get("/{room_id}/participants", response_model=list[ParticipantPublic])
 async def get_participants(room_id: str, session: AsyncSession = Depends(get_session)):
     await _get_room_or_404(session, room_id)
-    statement = select(RoomParticipant).where(RoomParticipant.room_id == room_id)
+    statement = (
+        select(RoomParticipant, User)
+        .join(User, User.id == RoomParticipant.user_id)
+        .where(RoomParticipant.room_id == room_id)
+    )
     result = await session.execute(statement)
-    participants = result.scalars().all()
-    return [ParticipantPublic.model_validate(p) for p in participants]
+    rows = result.all()
+    return [_participant_to_public(participant, user.username) for participant, user in rows]
 
 
 @router.post("/join", response_model=ParticipantPublic)
@@ -162,12 +172,14 @@ async def join_room(
         participant = await service.join_room(room=room, user=current_user, team_label=payload.team_label)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    participant_public = _participant_to_public(participant, current_user.username)
+
     await manager.broadcast_room(
         room.id,
         {
             "type": "participant_joined",
             "room_id": room.id,
-            "participant": ParticipantPublic.model_validate(participant).model_dump(),
+            "participant": participant_public.model_dump(),
         },
     )
     if participant.role == ParticipantRole.PLAYER:
@@ -180,7 +192,7 @@ async def join_room(
                 "player_two_id": room.player_two_id,
             },
         )
-    return ParticipantPublic.model_validate(participant)
+    return participant_public
 
 
 @router.post("/{room_id}/players", response_model=RoomPublic)
