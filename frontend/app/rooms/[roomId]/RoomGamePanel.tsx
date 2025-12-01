@@ -776,28 +776,6 @@ export default function RoomGamePanel({
             </div>
           </div>
 
-          <div className="space-y-2 rounded-lg border border-night-800/60 bg-night-950/30 p-4 text-sm text-night-300">
-            <p className="font-semibold text-night-200">문제 진행 상황</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {problemIndicators.length === 0 && <p className="text-night-500">등록된 문제가 없습니다.</p>}
-              {problemIndicators.map((state, index) => (
-                <span
-                  key={`indicator-${index}`}
-                  className={`rounded-full px-3 py-1 text-xs ${
-                    state === "done"
-                      ? "bg-emerald-600/20 text-emerald-300"
-                      : state === "current"
-                        ? "bg-indigo-600/20 text-indigo-200"
-                        : "bg-night-800 text-night-500"
-                  }`}
-                >
-                  #{index + 1} · {state === "done" ? "완료" : state === "current" ? "진행 중" : "비공개"}
-                </span>
-              ))}
-            </div>
-            <p className="text-xs text-night-500">다음 문제는 공개되지 않으며, 현재 문제만 확인할 수 있습니다.</p>
-          </div>
-
           <div className="grid gap-6 lg:grid-cols-2">
             {visibleSlots.map((slot) => {
               const isMine = mySlot === slot;
