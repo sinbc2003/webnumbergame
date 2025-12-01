@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,14 @@ class TournamentBundle:
     matches: List[TournamentMatch]
 
 
+def _strip_timezone(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 class TournamentService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
@@ -25,7 +34,7 @@ class TournamentService:
             name=payload.name,
             host_id=host.id,
             status=TournamentStatus.SEEDING,
-            starts_at=payload.starts_at,
+            starts_at=_strip_timezone(payload.starts_at),
         )
         self.session.add(tournament)
         await self.session.flush()

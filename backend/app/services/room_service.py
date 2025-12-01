@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from ..config import get_settings
-from ..enums import RoomStatus
+from ..enums import RoomStatus, ParticipantRole
 from ..models import Room, RoomParticipant, User
 from ..schemas.room import RoomCreate
 
@@ -30,11 +30,17 @@ class RoomService:
             host_id=host.id,
             round_type=payload.round_type,
             max_players=min(payload.max_players, settings.max_room_capacity),
+            player_one_id=host.id,
         )
         self.session.add(room)
         await self.session.flush()
 
-        participant = RoomParticipant(room_id=room.id, user_id=host.id, is_ready=True)
+        participant = RoomParticipant(
+            room_id=room.id,
+            user_id=host.id,
+            is_ready=True,
+            role=ParticipantRole.PLAYER,
+        )
         self.session.add(participant)
 
         await self.session.commit()
@@ -70,10 +76,26 @@ class RoomService:
         if existing:
             return existing
 
+        role = ParticipantRole.SPECTATOR
+        updated_room = False
+
+        if room.player_one_id is None:
+            room.player_one_id = user.id
+            role = ParticipantRole.PLAYER
+            updated_room = True
+        elif room.player_two_id is None and room.player_one_id != user.id:
+            room.player_two_id = user.id
+            role = ParticipantRole.PLAYER
+            updated_room = True
+
+        if updated_room:
+            self.session.add(room)
+
         participant = RoomParticipant(
             room_id=room.id,
             user_id=user.id,
             team_label=team_label,
+            role=role,
         )
         self.session.add(participant)
         await self.session.commit()

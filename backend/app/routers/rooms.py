@@ -8,7 +8,7 @@ from sqlmodel import select
 from ..config import get_settings
 from ..database import get_session
 from ..dependencies import get_current_user
-from ..enums import RoundType
+from ..enums import RoundType, ParticipantRole
 from ..events.manager import manager
 from ..models import Problem, Room, RoomParticipant, Submission, User
 from ..schemas.room import (
@@ -20,6 +20,7 @@ from ..schemas.room import (
     ParticipantPublic,
     ActiveMatchResponse,
     ActiveMatchProblem,
+    PlayerAssignmentRequest,
 )
 from ..services.game_service import GameService
 from ..services.room_service import RoomService
@@ -35,6 +36,25 @@ async def _get_room_or_404(session: AsyncSession, room_id: str) -> Room:
     if not room:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="방을 찾을 수 없습니다.")
     return room
+
+
+async def _set_participant_role(
+    session: AsyncSession,
+    room_id: str,
+    user_id: str | None,
+    role: ParticipantRole,
+) -> None:
+    if not user_id:
+        return
+    statement = select(RoomParticipant).where(
+        RoomParticipant.room_id == room_id,
+        RoomParticipant.user_id == user_id,
+    )
+    result = await session.execute(statement)
+    participant = result.scalar_one_or_none()
+    if participant:
+        participant.role = role
+        session.add(participant)
 
 
 @router.get("", response_model=list[RoomPublic])
@@ -95,6 +115,56 @@ async def join_room(
     return ParticipantPublic.model_validate(participant)
 
 
+@router.post("/{room_id}/players", response_model=RoomPublic)
+async def assign_player(
+    room_id: str,
+    payload: PlayerAssignmentRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    room = await _get_room_or_404(session, room_id)
+    if room.host_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="방장만 플레이어를 지정할 수 있습니다.")
+
+    slot_attr = "player_one_id" if payload.slot == "player_one" else "player_two_id"
+    previous_user_id = getattr(room, slot_attr)
+
+    if payload.user_id:
+        participant_stmt = select(RoomParticipant).where(
+            RoomParticipant.room_id == room.id,
+            RoomParticipant.user_id == payload.user_id,
+        )
+        participant_result = await session.execute(participant_stmt)
+        participant = participant_result.scalar_one_or_none()
+        if not participant:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="해당 사용자가 방에 참가해 있지 않습니다.")
+
+    setattr(room, slot_attr, payload.user_id)
+    other_attr = "player_two_id" if slot_attr == "player_one_id" else "player_one_id"
+    if payload.user_id and getattr(room, other_attr) == payload.user_id:
+        setattr(room, other_attr, previous_user_id if previous_user_id and previous_user_id != payload.user_id else None)
+
+    session.add(room)
+    await _set_participant_role(session, room.id, previous_user_id, ParticipantRole.SPECTATOR)
+    await _set_participant_role(session, room.id, payload.user_id, ParticipantRole.PLAYER)
+    await _set_participant_role(session, room.id, room.player_one_id, ParticipantRole.PLAYER)
+    await _set_participant_role(session, room.id, room.player_two_id, ParticipantRole.PLAYER)
+
+    await session.commit()
+    await session.refresh(room)
+
+    await manager.broadcast_room(
+        room.id,
+        {
+            "type": "player_assignment",
+            "room_id": room.id,
+            "player_one_id": room.player_one_id,
+            "player_two_id": room.player_two_id,
+        },
+    )
+    return RoomPublic.model_validate(room)
+
+
 @router.post("/{room_id}/rounds", response_model=dict)
 async def start_round(
     room_id: str,
@@ -105,6 +175,12 @@ async def start_round(
     room = await _get_room_or_404(session, room_id)
     if room.host_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="방장만 라운드를 시작할 수 있습니다.")
+
+    if not room.player_one_id or not room.player_two_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="두 플레이어가 지정되어야 합니다.",
+        )
 
     duration = payload.duration_minutes or settings.default_round_minutes
     problem_count = payload.problem_count or 5
@@ -124,7 +200,12 @@ async def start_round(
         {"target_number": problem.target_number, "optimal_cost": problem.optimal_cost} for problem in problems
     ]
     first = serialized[0]
-    metadata = {"problems": serialized, "current_index": 0}
+    metadata = {
+        "problems": serialized,
+        "current_index": 0,
+        "player_one_id": room.player_one_id,
+        "player_two_id": room.player_two_id,
+    }
 
     game_service = GameService(session)
     match = await game_service.create_match(
@@ -145,6 +226,8 @@ async def start_round(
         "deadline": match.deadline.isoformat() if match.deadline else None,
         "problems": serialized,
         "current_index": 0,
+        "player_one_id": room.player_one_id,
+        "player_two_id": room.player_two_id,
     }
     await manager.broadcast_room(room.id, event_payload)
     return event_payload
@@ -246,6 +329,8 @@ def _build_active_match_response(match) -> ActiveMatchResponse:
         {"target_number": match.target_number, "optimal_cost": match.optimal_cost}
     ]
     current_index = metadata.get("current_index", 0)
+    player_one_id = metadata.get("player_one_id")
+    player_two_id = metadata.get("player_two_id")
     mapped = [
         ActiveMatchProblem(
             target_number=item["target_number"],
@@ -263,6 +348,8 @@ def _build_active_match_response(match) -> ActiveMatchResponse:
         current_index=current_index,
         total_problems=len(mapped),
         problems=mapped,
+        player_one_id=player_one_id,
+        player_two_id=player_two_id,
     )
 
 

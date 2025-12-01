@@ -25,3 +25,7 @@ class TournamentStatus(str, Enum):
     LIVE = "live"
     COMPLETED = "completed"
 
+
+class ParticipantRole(str, Enum):
+    PLAYER = "player"
+    SPECTATOR = "spectator"
