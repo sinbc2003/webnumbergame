@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
@@ -18,6 +19,7 @@ const initialForm = {
 };
 
 export default function AdminPanel() {
+  const router = useRouter();
   const { user } = useAuth();
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,6 +118,7 @@ export default function AdminPanel() {
       setResetResult(data);
       setSuccess("데이터를 초기화했습니다.");
       fetchProblems();
+      router.refresh();
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? "초기화에 실패했습니다.");
     }

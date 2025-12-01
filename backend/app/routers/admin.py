@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
 from ..dependencies import get_admin_user
+from ..events.manager import manager
 from ..models import (
     Match,
     Problem,
@@ -87,6 +88,9 @@ async def delete_problem(problem_id: str, session: AsyncSession = Depends(get_se
 
 @router.post("/reset", response_model=ResetSummary)
 async def reset_arena(session: AsyncSession = Depends(get_session)) -> ResetSummary:
+    room_ids_result = await session.execute(select(Room.id))
+    room_ids = [row[0] for row in room_ids_result.fetchall()]
+
     model_sequence = [
         (Submission, "submissions"),
         (RoundSnapshot, "round_snapshots"),
@@ -109,7 +113,29 @@ async def reset_arena(session: AsyncSession = Depends(get_session)) -> ResetSumm
             await session.execute(sa_delete(model))
         deleted[label] = count
 
+    await session.execute(
+        sa_update(User).values(
+            rating=1200,
+            win_count=0,
+            loss_count=0,
+            total_score=0,
+        )
+    )
+
     await session.commit()
+
+    for room_id in room_ids:
+        await manager.broadcast_room(
+            room_id,
+            {
+                "type": "room_closed",
+                "room_id": room_id,
+                "reason": "admin_reset",
+            },
+        )
+
+    await manager.broadcast_dashboard({"type": "dashboard_reset"})
+
     return ResetSummary(deleted=deleted)
 
 
