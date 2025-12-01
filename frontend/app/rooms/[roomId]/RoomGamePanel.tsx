@@ -310,8 +310,8 @@ export default function RoomGamePanel({
   };
 
   const activeMatch = data ?? null;
-  const isSpectator = mySlot === null;
-  const containerClass = activeMatch
+  const hasActiveMatch = Boolean(activeMatch);
+  const containerClass = hasActiveMatch
     ? "fixed inset-0 z-40 overflow-y-auto bg-night-950/95 p-6 space-y-4"
     : "card space-y-4";
 
@@ -319,90 +319,104 @@ export default function RoomGamePanel({
     <div className={containerClass}>
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">실시간 경기</h2>
+        <span
+          className={`rounded-full border px-3 py-0.5 text-xs ${
+            hasActiveMatch ? "border-emerald-500 text-emerald-300" : "border-night-700 text-night-400"
+          }`}
+        >
+          {hasActiveMatch ? "진행 중" : "대기 중"}
+        </span>
       </div>
       {!user && <p className="text-sm text-night-400">로그인 후 이용할 수 있습니다.</p>}
 
-      {!activeMatch && !isLoading && (
-        <p className="text-sm text-night-400">진행 중인 라운드가 없습니다. 방장이 라운드를 시작하면 게임이 표시됩니다.</p>
+      {!hasActiveMatch && !isLoading && (
+        <div className="rounded-lg border border-night-800 bg-night-950/40 p-5 text-sm text-night-300">
+          <p className="font-semibold text-night-100">아직 라운드가 시작되지 않았습니다.</p>
+          <p className="mt-2 text-night-400">
+            방장이 두 명의 플레이어를 지정하고 라운드를 시작하면 게임 화면이 전체에 표시됩니다.
+          </p>
+        </div>
       )}
 
       {statusMessage && <p className="text-sm text-green-400">{statusMessage}</p>}
       {statusError && <p className="text-sm text-red-400">{statusError}</p>}
 
-      <div className="grid gap-3 rounded-lg border border-night-800/60 bg-night-950/40 p-4 text-sm text-night-200 sm:grid-cols-2">
-        <div>
-          <p className="text-night-500">현재 문제</p>
-          <p className="text-2xl font-bold text-white">{activeMatch?.target_number ?? "-"}</p>
-        </div>
-        <div>
-          <p className="text-night-500">남은 시간</p>
-          <p className="text-2xl font-bold text-indigo-400">{formatRemaining()}</p>
-        </div>
-        <div>
-          <p className="text-night-500">최적 코스트</p>
-          <p className="text-xl font-semibold text-night-100">{activeMatch?.optimal_cost ?? "-"}</p>
-        </div>
-        <div>
-          <p className="text-night-500">문제 진행도</p>
-          <p className="text-xl font-semibold text-night-100">
-            {activeMatch ? `${activeMatch.current_index + 1} / ${activeMatch.total_problems}` : "-"}
-          </p>
-        </div>
-      </div>
-
-      {activeMatch && (
-        <div className="space-y-2 rounded-lg border border-night-800/60 bg-night-950/30 p-4 text-xs text-night-300">
-          <p className="font-semibold text-night-200">현재 라운드 문제 목록</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {activeMatch.problems.map((problem) => (
-              <div
-                key={`${problem.target_number}-${problem.index}`}
-                className={`rounded-md border px-3 py-2 ${
-                  problem.index === activeMatch.current_index
-                    ? "border-indigo-500 bg-indigo-500/10 text-indigo-100"
-                    : "border-night-800 text-night-300"
-                }`}
-              >
-                <p>#{problem.index + 1}</p>
-                <p className="text-sm font-semibold text-white">{problem.target_number}</p>
-                <p className="text-[11px] text-night-400">최적 {problem.optimal_cost}</p>
-              </div>
-            ))}
+      {hasActiveMatch && (
+        <>
+          <div className="grid gap-3 rounded-lg border border-night-800/60 bg-night-950/40 p-4 text-sm text-night-200 sm:grid-cols-2">
+            <div>
+              <p className="text-night-500">현재 문제</p>
+              <p className="text-2xl font-bold text-white">{activeMatch?.target_number ?? "-"}</p>
+            </div>
+            <div>
+              <p className="text-night-500">남은 시간</p>
+              <p className="text-2xl font-bold text-indigo-400">{formatRemaining()}</p>
+            </div>
+            <div>
+              <p className="text-night-500">최적 코스트</p>
+              <p className="text-xl font-semibold text-night-100">{activeMatch?.optimal_cost ?? "-"}</p>
+            </div>
+            <div>
+              <p className="text-night-500">문제 진행도</p>
+              <p className="text-xl font-semibold text-night-100">
+                {activeMatch ? `${activeMatch.current_index + 1} / ${activeMatch.total_problems}` : "-"}
+              </p>
+            </div>
           </div>
-        </div>
-      )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {(["playerOne", "playerTwo"] as BoardSlot[]).map((slot) => {
-          const isMine = mySlot === slot;
-          const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
-          return (
-            <PlayerPanel
-              key={slot}
-              title={slot === "playerOne" ? "플레이어 1" : "플레이어 2"}
-              userLabel={participantLabel(assignedUser)}
-              expression={boards[slot].expression}
-              history={boards[slot].history}
-              onExpressionChange={
-                isMine
-                  ? (value) => {
-                      setBoards((prev) => ({
-                        ...prev,
-                        [slot]: { ...prev[slot], expression: value },
-                      }));
-                      setPendingInput({ slot, value });
-                    }
-                  : undefined
-              }
-              onSubmit={isMine ? () => submitExpression(slot) : undefined}
-              disabled={!activeMatch || !assignedUser}
-              isMine={isMine}
-              submitting={submittingSlot === slot}
-              placeholder={slot === "playerOne" ? "예: (1+2)*3" : "예: (1+3)*2"}
-            />
-          );
-        })}
-      </div>
+          <div className="space-y-2 rounded-lg border border-night-800/60 bg-night-950/30 p-4 text-xs text-night-300">
+            <p className="font-semibold text-night-200">이번 라운드 문제 목록</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {activeMatch?.problems.map((problem) => (
+                <div
+                  key={`${problem.target_number}-${problem.index}`}
+                  className={`rounded-md border px-3 py-2 ${
+                    problem.index === activeMatch.current_index
+                      ? "border-indigo-500 bg-indigo-500/10 text-indigo-100"
+                      : "border-night-800 text-night-300"
+                  }`}
+                >
+                  <p>#{problem.index + 1}</p>
+                  <p className="text-sm font-semibold text-white">{problem.target_number}</p>
+                  <p className="text-[11px] text-night-400">최적 {problem.optimal_cost}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            {(["playerOne", "playerTwo"] as BoardSlot[]).map((slot) => {
+              const isMine = mySlot === slot;
+              const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
+              return (
+                <PlayerPanel
+                  key={slot}
+                  title={slot === "playerOne" ? "플레이어 1" : "플레이어 2"}
+                  userLabel={participantLabel(assignedUser)}
+                  expression={boards[slot].expression}
+                  history={boards[slot].history}
+                  onExpressionChange={
+                    isMine
+                      ? (value) => {
+                          setBoards((prev) => ({
+                            ...prev,
+                            [slot]: { ...prev[slot], expression: value },
+                          }));
+                          setPendingInput({ slot, value });
+                        }
+                      : undefined
+                  }
+                  onSubmit={isMine ? () => submitExpression(slot) : undefined}
+                  disabled={!activeMatch || !assignedUser}
+                  isMine={isMine}
+                  submitting={submittingSlot === slot}
+                  placeholder={slot === "playerOne" ? "예: (1+2)*3" : "예: (1+3)*2"}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }

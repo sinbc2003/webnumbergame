@@ -183,6 +183,25 @@ export default function RoomRealtimePanel({
 
   const spectators = participantList.filter((p) => p.role !== "player");
 
+  const describeEvent = (event: EventMessage) => {
+    switch (event.type) {
+      case "player_assignment":
+        return "플레이어 구성이 변경되었습니다.";
+      case "participant_joined":
+        return `${displayName(event.participant)} 님이 입장했습니다.`;
+      case "participant_left":
+        return "참가자가 퇴장했습니다.";
+      case "round_started":
+        return "라운드가 시작되었습니다.";
+      case "round_finished":
+        return "라운드가 종료되었습니다.";
+      case "problem_advanced":
+        return "다음 문제로 이동했습니다.";
+      default:
+        return JSON.stringify(event);
+    }
+  };
+
   return (
     <div className="card space-y-4">
       <div>
@@ -316,28 +335,30 @@ export default function RoomRealtimePanel({
         </div>
       )}
 
-      <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
-        <p className="text-sm font-semibold text-night-200">관전자 {spectators.length}명</p>
-        <div className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-night-400">
-          {spectators.length === 0 && <p>아직 관전자가 없습니다.</p>}
-          {spectators.map((spectator) => (
-            <p key={spectator.id}>• {displayName(spectator)}</p>
-          ))}
+      {spectators.length > 0 && (
+        <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
+          <p className="text-sm font-semibold text-night-200">관전자 {spectators.length}명</p>
+          <div className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-night-400">
+            {spectators.map((spectator) => (
+              <p key={spectator.id}>• {displayName(spectator)}</p>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      <div>
-        <p className="text-sm font-semibold text-night-200">실시간 이벤트</p>
-        <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-lg border border-night-800 bg-night-950/40 p-3 text-xs text-night-300">
-          {events.length === 0 && <p>아직 이벤트가 없습니다.</p>}
-          {events.map((event, index) => (
-            <p key={`${event.type}-${index}`} className="flex justify-between gap-2">
-              <span className="font-semibold text-night-200">{event.type}</span>
-              <span className="truncate text-right text-night-400">{JSON.stringify(event)}</span>
-            </p>
-          ))}
+      {events.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold text-night-200">실시간 이벤트</p>
+          <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-lg border border-night-800 bg-night-950/40 p-3 text-xs text-night-300">
+            {events.map((event, index) => (
+              <div key={`${event.type}-${index}`} className="rounded border border-night-800/60 bg-night-900/40 p-2">
+                <p className="font-semibold text-night-100">{event.type}</p>
+                <p className="mt-1 text-night-400">{describeEvent(event)}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
