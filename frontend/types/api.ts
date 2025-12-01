@@ -46,7 +46,13 @@ export interface LeaderboardEntry {
   username: string;
   rating: number;
   win_count: number;
+  loss_count: number;
+  total_matches: number;
   total_score: number;
+  win_points: number;
+  accuracy_points: number;
+  activity_points: number;
+  performance_score: number;
 }
 
 export interface DashboardSummary {
