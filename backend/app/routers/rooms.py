@@ -23,6 +23,13 @@ from ..schemas.room import (
     PlayerAssignmentRequest,
     InputUpdateRequest,
 )
+from ..services.game_service import GameService
+from ..services.room_service import RoomService
+
+router = APIRouter(prefix="/rooms", tags=["rooms"])
+settings = get_settings()
+
+
 @router.delete("/{room_id}/participants/me", status_code=status.HTTP_204_NO_CONTENT)
 async def leave_room(
     room_id: str,
@@ -78,12 +85,6 @@ async def leave_room(
                 "player_two_id": room.player_two_id,
             },
         )
-
-from ..services.game_service import GameService
-from ..services.room_service import RoomService
-
-router = APIRouter(prefix="/rooms", tags=["rooms"])
-settings = get_settings()
 
 
 async def _get_room_or_404(session: AsyncSession, room_id: str) -> Room:

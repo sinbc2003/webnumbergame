@@ -75,23 +75,6 @@ export default function RoomRealtimePanel({
     });
   }, [playerOneId, playerTwoId]);
 
-  useEffect(() => {
-    setParticipantList(participants);
-  }, [participants]);
-
-  const refreshParticipants = useCallback(async () => {
-    try {
-      const { data } = await api.get<Participant[]>(`/rooms/${roomId}/participants`);
-      setParticipantList(data);
-    } catch {
-      // ignore
-    }
-  }, [roomId]);
-
-  useEffect(() => {
-    refreshParticipants();
-  }, [refreshParticipants]);
-
   const refreshParticipants = useCallback(async () => {
     try {
       const { data } = await api.get<Participant[]>(`/rooms/${roomId}/participants`);
