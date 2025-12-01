@@ -21,6 +21,8 @@ poetry run uvicorn app.main:app --reload
 DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DB
 SECRET_KEY=랜덤문자열
 NEXT_PUBLIC_API_BASE=http://localhost:8000/api
+DB_INIT_MAX_RETRIES=5
+DB_INIT_RETRY_INTERVAL_SECONDS=2
 ``` 
 
 Cloud Run 배포 시 `poetry export`로 requirements.txt를 생성하거나 Dockerfile에서 직접 poetry를 사용하면 됩니다.  11 

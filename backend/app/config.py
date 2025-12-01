@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     default_round_minutes: int = 3
     leaderboard_window_hours: int = 24
     max_room_capacity: int = 16
+    db_init_max_retries: int = 5
+    db_init_retry_interval_seconds: float = 2.0
 
 
 @lru_cache

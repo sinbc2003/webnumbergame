@@ -25,6 +25,8 @@ uvicorn app.main:app --reload --port 8000
 ```
 DATABASE_URL=sqlite+aiosqlite:///./number_game.db   # 또는 Cloud SQL/Postgres URL
 SECRET_KEY=랜덤문자열
+DB_INIT_MAX_RETRIES=5
+DB_INIT_RETRY_INTERVAL_SECONDS=2
 ```
 
 ### 2) 프론트엔드
