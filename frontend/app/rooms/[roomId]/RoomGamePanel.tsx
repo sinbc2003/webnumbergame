@@ -153,6 +153,19 @@ export default function RoomGamePanel({
             });
             break;
           }
+          case "participant_left": {
+            if (!payload.user_id) break;
+            setParticipantState((prev) => prev.filter((p) => p.user_id !== payload.user_id));
+            if (playerIdsRef.current.playerOne === payload.user_id) {
+              playerIdsRef.current.playerOne = undefined;
+              setPlayerOne(undefined);
+            }
+            if (playerIdsRef.current.playerTwo === payload.user_id) {
+              playerIdsRef.current.playerTwo = undefined;
+              setPlayerTwo(undefined);
+            }
+            break;
+          }
           case "input_update": {
             const slot = slotFromUserId(payload.user_id);
             if (!slot) break;
@@ -200,6 +213,12 @@ export default function RoomGamePanel({
           case "round_finished": {
             setStatusMessage("라운드가 종료되었습니다.");
             mutate();
+            setIsFullscreen(false);
+            break;
+          }
+          case "room_closed": {
+            setStatusError("방장이 방을 종료했습니다.");
+            setTimeout(() => router.push("/rooms"), 1000);
             break;
           }
           default:
@@ -210,7 +229,7 @@ export default function RoomGamePanel({
       }
     };
     return () => ws.close();
-  }, [user, wsUrl, mutate]);
+  }, [user, wsUrl, mutate, router]);
 
   useEffect(() => {
     if (!data?.deadline) {
@@ -289,10 +308,28 @@ export default function RoomGamePanel({
 
   const activeMatch = data ?? null;
   const isSpectator = mySlot === null;
+  useEffect(() => {
+    setIsFullscreen(Boolean(activeMatch));
+  }, [activeMatch]);
+
+  const containerClass = isFullscreen
+    ? "fixed inset-0 z-40 overflow-y-auto bg-night-950/95 p-6 space-y-4"
+    : "card space-y-4";
 
   return (
-    <div className="card space-y-4">
-      <h2 className="text-lg font-semibold text-white">실시간 경기</h2>
+    <div className={containerClass}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-white">실시간 경기</h2>
+        {activeMatch && (
+          <button
+            type="button"
+            onClick={() => setIsFullscreen((prev) => !prev)}
+            className="rounded-md border border-night-700 px-3 py-1 text-xs text-night-200 transition hover:border-indigo-500 hover:text-white"
+          >
+            {isFullscreen ? "축소" : "전체 화면"}
+          </button>
+        )}
+      </div>
       {!user && <p className="text-sm text-night-400">로그인 후 이용할 수 있습니다.</p>}
 
       {!activeMatch && !isLoading && (

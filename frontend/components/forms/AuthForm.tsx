@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/useAuth";
 
@@ -10,6 +11,7 @@ interface Props {
 
 export default function AuthForm({ mode }: Props) {
   const { login, register, loading } = useAuth();
+  const router = useRouter();
   const [nickname, setNickname] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -22,7 +24,7 @@ export default function AuthForm({ mode }: Props) {
       } else {
         await register(nickname);
       }
-      setMessage("입장되었습니다! 상단 메뉴에서 원하는 화면으로 이동해 주세요.");
+      router.push("/dashboard");
     } catch (error: any) {
       setMessage(error?.response?.data?.detail ?? "요청에 실패했습니다.");
     }

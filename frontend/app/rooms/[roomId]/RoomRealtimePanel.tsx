@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
@@ -58,6 +59,7 @@ export default function RoomRealtimePanel({
   });
 
   const { user } = useAuth();
+  const router = useRouter();
   const isHost = user?.id === hostId;
 
   useEffect(() => {
@@ -76,6 +78,19 @@ export default function RoomRealtimePanel({
   useEffect(() => {
     setParticipantList(participants);
   }, [participants]);
+
+  const refreshParticipants = useCallback(async () => {
+    try {
+      const { data } = await api.get<Participant[]>(`/rooms/${roomId}/participants`);
+      setParticipantList(data);
+    } catch {
+      // ignore
+    }
+  }, [roomId]);
+
+  useEffect(() => {
+    refreshParticipants();
+  }, [refreshParticipants]);
 
   const refreshParticipants = useCallback(async () => {
     try {
@@ -112,6 +127,12 @@ export default function RoomRealtimePanel({
             return [...prev, data.participant];
           });
           refreshParticipants();
+        } else if (data.type === "participant_left") {
+          setParticipantList((prev) => prev.filter((p) => p.user_id !== data.user_id));
+          refreshParticipants();
+        } else if (data.type === "room_closed") {
+          setError("방장이 방을 종료했습니다.");
+          setTimeout(() => router.push("/rooms"), 1000);
         }
         setEvents((prev) => [data, ...prev].slice(0, 30));
       } catch {
@@ -119,7 +140,7 @@ export default function RoomRealtimePanel({
       }
     };
     return () => ws.close();
-  }, [wsUrl, refreshParticipants]);
+  }, [wsUrl, refreshParticipants, router]);
 
   const handleStartRound = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -182,7 +203,23 @@ export default function RoomRealtimePanel({
       <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
         <div className="flex items-center justify-between">
           <p className="font-semibold text-night-100">플레이어 슬롯</p>
-          <p className="text-xs text-night-500">방장 전용</p>
+          <div className="flex items-center gap-2 text-xs text-night-500">
+            {isHost ? "방장 전용" : "관전자 모드"}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await api.delete(`/rooms/${roomId}/participants/me`);
+                  router.push("/rooms");
+                } catch (err: any) {
+                  setError(err?.response?.data?.detail ?? "방 나가기에 실패했습니다.");
+                }
+              }}
+              className="rounded-md border border-night-700 px-3 py-1 text-xs text-night-200 transition hover:border-red-500 hover:text-red-300"
+            >
+              방 나가기
+            </button>
+          </div>
         </div>
         {["player_one", "player_two"].map((slot) => {
           const isPlayerOne = slot === "player_one";

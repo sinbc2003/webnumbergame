@@ -23,6 +23,62 @@ from ..schemas.room import (
     PlayerAssignmentRequest,
     InputUpdateRequest,
 )
+@router.delete("/{room_id}/participants/me", status_code=status.HTTP_204_NO_CONTENT)
+async def leave_room(
+    room_id: str,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    room = await _get_room_or_404(session, room_id)
+    participant_stmt = select(RoomParticipant).where(
+        RoomParticipant.room_id == room.id,
+        RoomParticipant.user_id == current_user.id,
+    )
+    participant = (await session.execute(participant_stmt)).scalar_one_or_none()
+    if not participant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="참가 중이 아닙니다.")
+
+    await session.delete(participant)
+
+    slot_changed = False
+    if room.player_one_id == current_user.id:
+        room.player_one_id = None
+        slot_changed = True
+    if room.player_two_id == current_user.id:
+        room.player_two_id = None
+        slot_changed = True
+
+    if room.host_id == current_user.id:
+        await session.delete(room)
+        await session.commit()
+        await manager.broadcast_room(
+            room.id,
+            {"type": "room_closed", "room_id": room.id},
+        )
+        return
+
+    session.add(room)
+    await session.commit()
+
+    await manager.broadcast_room(
+        room.id,
+        {
+            "type": "participant_left",
+            "room_id": room.id,
+            "user_id": current_user.id,
+        },
+    )
+    if slot_changed:
+        await manager.broadcast_room(
+            room.id,
+            {
+                "type": "player_assignment",
+                "room_id": room.id,
+                "player_one_id": room.player_one_id,
+                "player_two_id": room.player_two_id,
+            },
+        )
+
 from ..services.game_service import GameService
 from ..services.room_service import RoomService
 
