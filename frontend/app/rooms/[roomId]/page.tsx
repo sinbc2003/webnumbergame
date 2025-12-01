@@ -80,7 +80,12 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
           </div>
         </section>
         <section>
-          <RoomRealtimePanel roomId={room.id} roomCode={room.code} />
+          <RoomRealtimePanel
+            roomId={room.id}
+            roomCode={room.code}
+            hostId={room.host_id}
+            currentRound={room.current_round}
+          />
         </section>
       </main>
     </div>
