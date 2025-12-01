@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
@@ -77,6 +77,19 @@ export default function RoomRealtimePanel({
     setParticipantList(participants);
   }, [participants]);
 
+  const refreshParticipants = useCallback(async () => {
+    try {
+      const { data } = await api.get<Participant[]>(`/rooms/${roomId}/participants`);
+      setParticipantList(data);
+    } catch {
+      // ignore errors
+    }
+  }, [roomId]);
+
+  useEffect(() => {
+    refreshParticipants();
+  }, [refreshParticipants]);
+
   useEffect(() => {
     const ws = new WebSocket(wsUrl);
     ws.onmessage = (event) => {
@@ -94,9 +107,11 @@ export default function RoomRealtimePanel({
           );
         } else if (data.type === "participant_joined") {
           setParticipantList((prev) => {
+            if (!data.participant) return prev;
             if (prev.some((p) => p.id === data.participant.id)) return prev;
             return [...prev, data.participant];
           });
+          refreshParticipants();
         }
         setEvents((prev) => [data, ...prev].slice(0, 30));
       } catch {
@@ -104,7 +119,7 @@ export default function RoomRealtimePanel({
       }
     };
     return () => ws.close();
-  }, [wsUrl]);
+  }, [wsUrl, refreshParticipants]);
 
   const handleStartRound = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
