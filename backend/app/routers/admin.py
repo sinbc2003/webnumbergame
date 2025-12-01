@@ -1,7 +1,7 @@
 from typing import Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete as sa_delete, func, select
+from sqlalchemy import delete as sa_delete, func, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
@@ -18,8 +18,11 @@ from ..models import (
     Tournament,
     TournamentMatch,
     TournamentSlot,
+    User,
 )
 from ..schemas.problem import ProblemCreate, ProblemPublic, ProblemUpdate, ResetSummary
+from ..schemas.admin import UserResetRequest, UserResetResponse
+from ..schemas.user import UserPublic
 
 router = APIRouter(
     prefix="/admin",
@@ -108,5 +111,32 @@ async def reset_arena(session: AsyncSession = Depends(get_session)) -> ResetSumm
 
     await session.commit()
     return ResetSummary(deleted=deleted)
+
+
+@router.post("/users/reset", response_model=UserResetResponse)
+async def reset_user_account(
+    payload: UserResetRequest,
+    session: AsyncSession = Depends(get_session),
+) -> UserResetResponse:
+    statement = select(User).where(User.username == payload.username)
+    if payload.user_id:
+        statement = statement.where(User.id == payload.user_id)
+    result = await session.execute(statement)
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="사용자를 찾을 수 없습니다.")
+
+    user.rating = 1200
+    user.win_count = 0
+    user.loss_count = 0
+    user.total_score = 0
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+
+    return UserResetResponse(
+        user=UserPublic.model_validate(user),
+        message="계정을 초기화했습니다.",
+    )
 
 

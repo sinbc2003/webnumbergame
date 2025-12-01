@@ -107,6 +107,11 @@ export interface ResetSummary {
   deleted: Record<string, number>;
 }
 
+export interface UserResetResponse {
+  user: User;
+  message: string;
+}
+
 export interface ActiveMatchProblem {
   target_number: number;
   optimal_cost: number;

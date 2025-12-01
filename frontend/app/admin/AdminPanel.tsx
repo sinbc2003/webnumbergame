@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
-import type { Problem, ResetSummary } from "@/types/api";
+import type { Problem, ResetSummary, UserResetResponse } from "@/types/api";
 
 const roundTypeLabels: Record<string, string> = {
   round1_individual: "1라운드 개인전",
@@ -25,6 +25,9 @@ export default function AdminPanel() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [resetResult, setResetResult] = useState<ResetSummary | null>(null);
+  const [resetUserMessage, setResetUserMessage] = useState<string | null>(null);
+  const [resetUserError, setResetUserError] = useState<string | null>(null);
+  const [resetUserPayload, setResetUserPayload] = useState({ username: "", user_id: "" });
 
   const fetchProblems = useCallback(async () => {
     if (!user?.is_admin) return;
@@ -55,6 +58,22 @@ export default function AdminPanel() {
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleUserReset = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setResetUserError(null);
+    setResetUserMessage(null);
+    try {
+      const payload = {
+        username: resetUserPayload.username.trim(),
+        user_id: resetUserPayload.user_id.trim() || undefined,
+      };
+      const { data } = await api.post<UserResetResponse>("/admin/users/reset", payload);
+      setResetUserMessage(`${data.user.username} 계정을 초기화했습니다.`);
+    } catch (err: any) {
+      setResetUserError(err?.response?.data?.detail ?? "계정 초기화에 실패했습니다.");
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -206,6 +225,53 @@ export default function AdminPanel() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-night-800 bg-night-950/50 p-5">
+        <h2 className="text-lg font-semibold text-white">계정 초기화</h2>
+        <p className="mt-1 text-sm text-night-400">닉네임 또는 사용자 ID를 입력하면 랭킹/점수가 초기화됩니다.</p>
+        <form onSubmit={handleUserReset} className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="text-sm text-night-300">
+            닉네임
+            <input
+              type="text"
+              value={resetUserPayload.username}
+              onChange={(e) =>
+                setResetUserPayload((prev) => ({
+                  ...prev,
+                  username: e.target.value,
+                }))
+              }
+              placeholder="필수"
+              required
+              className="mt-1 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+          <label className="text-sm text-night-300">
+            사용자 ID (선택)
+            <input
+              type="text"
+              value={resetUserPayload.user_id}
+              onChange={(e) =>
+                setResetUserPayload((prev) => ({
+                  ...prev,
+                  user_id: e.target.value,
+                }))
+              }
+              className="mt-1 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+            />
+          </label>
+          <div className="sm:col-span-2">
+            <button
+              type="submit"
+              className="w-full rounded-md bg-amber-600 py-2 text-sm font-semibold text-white transition hover:bg-amber-500"
+            >
+              계정 초기화
+            </button>
+            {resetUserError && <p className="mt-2 text-xs text-red-400">{resetUserError}</p>}
+            {resetUserMessage && <p className="mt-2 text-xs text-green-400">{resetUserMessage}</p>}
+          </div>
+        </form>
       </div>
 
       <div className="rounded-xl border border-red-900/60 bg-red-900/10 p-5 text-sm text-red-100">
