@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from ..config import get_settings
-from ..enums import RoomStatus, ParticipantRole
-from ..models import Room, RoomParticipant, User
+from ..enums import RoomStatus, ParticipantRole, MatchStatus
+from ..models import Room, RoomParticipant, User, Match
 from ..schemas.room import RoomCreate
 
 settings = get_settings()
@@ -71,6 +71,12 @@ class RoomService:
         if current_count >= room.max_players:
             raise ValueError("방 정원이 가득 찼습니다.")
 
+        active_match_stmt = (
+            select(func.count(Match.id))
+            .where(Match.room_id == room.id, Match.status == MatchStatus.ACTIVE)
+        )
+        has_active_match = (await self.session.execute(active_match_stmt)).scalar() or 0
+
         statement = select(RoomParticipant).where(
             RoomParticipant.room_id == room.id,
             RoomParticipant.user_id == user.id,
@@ -83,14 +89,15 @@ class RoomService:
         role = ParticipantRole.SPECTATOR
         updated_room = False
 
-        if room.player_one_id is None:
-            room.player_one_id = user.id
-            role = ParticipantRole.PLAYER
-            updated_room = True
-        elif room.player_two_id is None and room.player_one_id != user.id:
-            room.player_two_id = user.id
-            role = ParticipantRole.PLAYER
-            updated_room = True
+        if not has_active_match:
+            if room.player_one_id is None:
+                room.player_one_id = user.id
+                role = ParticipantRole.PLAYER
+                updated_room = True
+            elif room.player_two_id is None and room.player_one_id != user.id:
+                room.player_two_id = user.id
+                role = ParticipantRole.PLAYER
+                updated_room = True
 
         if updated_room:
             self.session.add(room)
