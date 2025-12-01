@@ -50,6 +50,10 @@ class RoomService:
     async def list_active_rooms(self) -> Sequence[Room]:
         statement = (
             select(Room)
+            .join(
+                RoomParticipant,
+                (RoomParticipant.room_id == Room.id) & (RoomParticipant.user_id == Room.host_id),
+            )
             .where(Room.status != RoomStatus.ARCHIVED)
             .order_by(Room.created_at.desc())
         )

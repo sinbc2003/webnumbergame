@@ -99,7 +99,22 @@ async def _get_room_or_404(session: AsyncSession, room_id: str) -> Room:
     room = result.scalar_one_or_none()
     if not room:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="방을 찾을 수 없습니다.")
+    await _ensure_host_active(session, room)
     return room
+
+
+async def _ensure_host_active(session: AsyncSession, room: Room) -> None:
+    stmt = select(RoomParticipant.id).where(
+        RoomParticipant.room_id == room.id,
+        RoomParticipant.user_id == room.host_id,
+    )
+    host = (await session.execute(stmt)).scalar_one_or_none()
+    if host:
+        return
+
+    await session.delete(room)
+    await session.commit()
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="방이 종료되었습니다.")
 
 
 async def _set_participant_role(
@@ -168,6 +183,7 @@ async def join_room(
     room = await service.get_room_by_code(payload.code)
     if not room:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="참가 코드를 찾을 수 없습니다.")
+    await _ensure_host_active(session, room)
     try:
         participant = await service.join_room(room=room, user=current_user, team_label=payload.team_label)
     except ValueError as exc:
