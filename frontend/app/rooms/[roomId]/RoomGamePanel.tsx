@@ -364,7 +364,7 @@ export default function RoomGamePanel({ room, participants }: Props) {
 
   const createSlotEntries = useCallback(
     (roster: Participant[], type: "friendly" | "enemy"): LobbySlotEntry[] => {
-      const accent = type === "friendly" ? "emerald" : "red";
+      const accent: LobbySlotEntry["accent"] = type === "friendly" ? "emerald" : "red";
       const slots = roster.slice(0, 6).map((participant, index) => ({
         key: participant.id,
         label: participantLabel(participant.user_id),
