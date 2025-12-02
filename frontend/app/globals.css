@@ -7,8 +7,15 @@
 }
 
 body {
-  @apply bg-night-950 text-slate-100 min-h-screen;
+  @apply text-slate-100 min-h-screen;
   font-family: "Pretendard Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #03060f;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(54, 95, 168, 0.35), transparent 55%),
+    radial-gradient(circle at 80% 0%, rgba(36, 109, 160, 0.32), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(103, 81, 181, 0.25), transparent 50%),
+    linear-gradient(120deg, #03060f 0%, #050b19 45%, #070c1d 100%);
+  background-attachment: fixed;
 }
 
 .card {

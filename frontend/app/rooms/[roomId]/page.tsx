@@ -46,43 +46,17 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
   }
 
   return (
-    <div>
+    <div className="min-h-screen">
       <TopNav />
-      <main className="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[2fr_1fr]">
-        <section className="space-y-4">
-          <div className="card">
-            <h1 className="text-2xl font-semibold text-white">{room.name}</h1>
-            <p className="mt-1 text-night-400">{room.description}</p>
-            <div className="mt-4 grid gap-3 text-sm text-night-300 sm:grid-cols-2">
-              <div>
-                <p className="text-night-500">모드</p>
-                <p className="text-white">{room.round_type === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전"}</p>
-              </div>
-              <div>
-                <p className="text-night-500">최대 인원</p>
-                <p className="text-white">{room.max_players}명</p>
-              </div>
-            </div>
-          </div>
-          <RoomGamePanel
-            roomId={room.id}
-            roundType={room.round_type}
-            playerOneId={room.player_one_id ?? undefined}
-            playerTwoId={room.player_two_id ?? undefined}
-            participants={participants}
-          />
-        </section>
-        <section>
-          <RoomRealtimePanel
-            roomId={room.id}
-            roomCode={room.code}
-            hostId={room.host_id}
-            currentRound={room.current_round}
-            playerOneId={room.player_one_id ?? undefined}
-            playerTwoId={room.player_two_id ?? undefined}
-            participants={participants}
-          />
-        </section>
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="grid gap-6 lg:grid-cols-[2.2fr,1fr]">
+          <section>
+            <RoomGamePanel room={room} participants={participants} />
+          </section>
+          <section>
+            <RoomRealtimePanel room={room} participants={participants} />
+          </section>
+        </div>
       </main>
     </div>
   );

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
-import type { Participant } from "@/types/api";
+import type { Participant, Room } from "@/types/api";
 
 interface EventMessage {
   type: string;
@@ -14,12 +14,7 @@ interface EventMessage {
 }
 
 interface Props {
-  roomId: string;
-  roomCode: string;
-  hostId: string;
-  currentRound: number;
-  playerOneId?: string;
-  playerTwoId?: string;
+  room: Room;
   participants: Participant[];
 }
 
@@ -32,30 +27,25 @@ const resolveWsBase = () => {
   return trimmed.replace(/^http/, "ws");
 };
 
-export default function RoomRealtimePanel({
-  roomId,
-  roomCode,
-  hostId,
-  currentRound,
-  playerOneId,
-  playerTwoId,
-  participants,
-}: Props) {
+export default function RoomRealtimePanel({ room, participants }: Props) {
+  const roomId = room.id;
+  const roomCode = room.code;
+  const hostId = room.host_id;
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
   const [events, setEvents] = useState<EventMessage[]>([]);
-  const [roundNumber, setRoundNumber] = useState(currentRound);
+  const [roundNumber, setRoundNumber] = useState(room.current_round);
   const [durationMinutes, setDurationMinutes] = useState(3);
   const [problemCount, setProblemCount] = useState(5);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [playerOne, setPlayerOne] = useState<string | undefined>(playerOneId ?? undefined);
-  const [playerTwo, setPlayerTwo] = useState<string | undefined>(playerTwoId ?? undefined);
+  const [playerOne, setPlayerOne] = useState<string | undefined>(room.player_one_id ?? undefined);
+  const [playerTwo, setPlayerTwo] = useState<string | undefined>(room.player_two_id ?? undefined);
   const [participantList, setParticipantList] = useState<Participant[]>(participants);
   const [assigningSlot, setAssigningSlot] = useState<"player_one" | "player_two" | null>(null);
   const [selectedPlayers, setSelectedPlayers] = useState({
-    player_one: playerOneId ?? "",
-    player_two: playerTwoId ?? "",
+    player_one: room.player_one_id ?? "",
+    player_two: room.player_two_id ?? "",
   });
   const joinStateRef = useRef<{ userId?: string; joined: boolean }>({ joined: false });
 
@@ -64,17 +54,17 @@ export default function RoomRealtimePanel({
   const isHost = user?.id === hostId;
 
   useEffect(() => {
-    setRoundNumber(currentRound);
-  }, [currentRound]);
+    setRoundNumber(room.current_round);
+  }, [room.current_round]);
 
   useEffect(() => {
-    setPlayerOne(playerOneId ?? undefined);
-    setPlayerTwo(playerTwoId ?? undefined);
+    setPlayerOne(room.player_one_id ?? undefined);
+    setPlayerTwo(room.player_two_id ?? undefined);
     setSelectedPlayers({
-      player_one: playerOneId ?? "",
-      player_two: playerTwoId ?? "",
+      player_one: room.player_one_id ?? "",
+      player_two: room.player_two_id ?? "",
     });
-  }, [playerOneId, playerTwoId]);
+  }, [room.player_one_id, room.player_two_id]);
 
   useEffect(() => {
     setParticipantList(participants);
@@ -98,41 +88,41 @@ export default function RoomRealtimePanel({
     return () => clearInterval(interval);
   }, [refreshParticipants]);
 
-useEffect(() => {
-  if (!user?.id || !roomCode) return;
+  useEffect(() => {
+    if (!user?.id || !roomCode) return;
 
-  if (participantList.some((p) => p.user_id === user.id)) {
-    joinStateRef.current = { userId: user.id, joined: true };
-    return;
-  }
-
-  if (joinStateRef.current.joined && joinStateRef.current.userId === user.id) {
-    return;
-  }
-
-  let cancelled = false;
-
-  const attemptJoin = async () => {
-    joinStateRef.current = { userId: user.id, joined: true };
-    try {
-      await api.post("/rooms/join", {
-        code: roomCode,
-        team_label: null,
-      });
-      refreshParticipants();
-    } catch (err: any) {
-      if (cancelled) return;
-      joinStateRef.current = { userId: user.id, joined: false };
-      setError(err?.response?.data?.detail ?? "방 참가에 실패했습니다.");
+    if (participantList.some((p) => p.user_id === user.id)) {
+      joinStateRef.current = { userId: user.id, joined: true };
+      return;
     }
-  };
 
-  attemptJoin();
+    if (joinStateRef.current.joined && joinStateRef.current.userId === user.id) {
+      return;
+    }
 
-  return () => {
-    cancelled = true;
-  };
-}, [user?.id, roomCode, participantList, refreshParticipants]);
+    let cancelled = false;
+
+    const attemptJoin = async () => {
+      joinStateRef.current = { userId: user.id, joined: true };
+      try {
+        await api.post("/rooms/join", {
+          code: roomCode,
+          team_label: null,
+        });
+        refreshParticipants();
+      } catch (err: any) {
+        if (cancelled) return;
+        joinStateRef.current = { userId: user.id, joined: false };
+        setError(err?.response?.data?.detail ?? "방 참가에 실패했습니다.");
+      }
+    };
+
+    attemptJoin();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, roomCode, participantList, refreshParticipants]);
 
   useEffect(() => {
     const ws = new WebSocket(wsUrl);
@@ -145,8 +135,7 @@ useEffect(() => {
           setParticipantList((prev) =>
             prev.map((p) => ({
               ...p,
-              role:
-                p.user_id === data.player_one_id || p.user_id === data.player_two_id ? "player" : "spectator",
+              role: p.user_id === data.player_one_id || p.user_id === data.player_two_id ? "player" : "spectator",
             })),
           );
         } else if (data.type === "participant_joined") {
@@ -227,8 +216,6 @@ useEffect(() => {
     return displayName(participant, userId);
   };
 
-  const spectators = participantList.filter((p) => p.role !== "player");
-
   const participantItems = participantList.map((participant) => {
     const baseLabel = participant.user_id === hostId ? "방장" : participant.role === "player" ? "플레이어" : "관전자";
     const slotLabel =
@@ -244,6 +231,19 @@ useEffect(() => {
       isHost: participant.user_id === hostId,
     };
   });
+
+  const spectatorCount = participantList.filter((p) => p.role !== "player").length;
+  const modeLabel = room.round_type === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
+  const statusLabel =
+    room.status === "in_progress" ? "진행 중" : room.status === "completed" ? "종료" : "대기 중";
+  const statusBadgeClass =
+    room.status === "in_progress"
+      ? "border-emerald-500 text-emerald-300"
+      : room.status === "completed"
+        ? "border-night-600 text-night-200"
+        : "border-amber-400 text-amber-200";
+  const mapName = room.description?.trim() || "추억의 성큰웨이 #X2";
+  const hostDisplayName = displayName(participantList.find((p) => p.user_id === hostId), hostId);
 
   const describeEvent = (event: EventMessage) => {
     switch (event.type) {
@@ -265,41 +265,72 @@ useEffect(() => {
   };
 
   return (
-      <div className="card space-y-4">
-      <div>
-        <p className="text-sm font-semibold text-night-200">참가 코드</p>
-        <p className="text-2xl font-bold tracking-widest text-white">{roomCode}</p>
-      </div>
-
-        <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
-          <div className="flex items-center justify-between">
-            <p className="font-semibold text-night-100">참여자 {participantItems.length}명</p>
-            <span className="text-xs text-night-500">방장/플레이어/관전자</span>
+    <div className="space-y-5 text-sm text-night-200">
+      <div className="rounded-3xl border border-night-800/80 bg-[#080f1f]/80 p-5 shadow-[0_25px_50px_rgba(0,0,0,0.55)]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.4em] text-night-500">참가 코드</p>
+            <p className="text-3xl font-black tracking-[0.35em] text-emerald-300">{roomCode}</p>
+            <p className="text-xs text-night-500">
+              참가자 {participantItems.length}명 · 관전자 {spectatorCount}명
+            </p>
           </div>
-          <div className="mt-3 space-y-2 text-sm">
-            {participantItems.length === 0 && <p className="text-night-500">아직 참가자가 없습니다.</p>}
-            {participantItems.map((participant) => (
-              <div
-                key={participant.id}
-                className="flex items-center justify-between rounded border border-night-900 bg-night-950/60 px-3 py-2"
-              >
-                <div>
-                  <p className="font-semibold text-white">{participant.label}</p>
-                  <p className="text-xs text-night-500">{participant.roleLabel}</p>
-                </div>
-                {participant.isHost && (
-                  <span className="rounded-full border border-amber-400 px-2 py-0.5 text-[10px] text-amber-300">
-                    호스트
-                  </span>
-                )}
-              </div>
-            ))}
+          <div className="text-right">
+            <p className="text-night-500">방 상태</p>
+            <span className={`inline-flex rounded-full border px-4 py-1 text-xs font-semibold ${statusBadgeClass}`}>
+              {statusLabel}
+            </span>
+            <p className="mt-1 text-xs text-night-500">현재 라운드 {roundNumber}</p>
           </div>
         </div>
+      </div>
 
-      <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
+      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
+        <div className="grid gap-5">
+          <div className="rounded-2xl border border-night-800 bg-[radial-gradient(circle_at_top,#202f55,#060b18)] p-4">
+            <div className="grid grid-cols-6 gap-1">
+              {Array.from({ length: 24 }).map((_, index) => (
+                <div
+                  key={`cell-${index}`}
+                  className={`h-6 rounded-sm ${
+                    index % 5 === 0 ? "bg-emerald-400/60" : index % 7 === 0 ? "bg-red-400/40" : "bg-night-800/80"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-3 text-xs text-night-300 sm:grid-cols-2">
+            <div>
+              <p className="text-night-500">게임 이름</p>
+              <p className="text-lg font-semibold text-white">{room.name}</p>
+            </div>
+            <div>
+              <p className="text-night-500">지도 이름</p>
+              <p className="text-lg font-semibold text-white">{mapName}</p>
+            </div>
+            <div>
+              <p className="text-night-500">모드</p>
+              <p className="text-lg font-semibold text-white">{modeLabel}</p>
+            </div>
+            <div>
+              <p className="text-night-500">호스트</p>
+              <p className="text-lg font-semibold text-white">{hostDisplayName}</p>
+            </div>
+            <div>
+              <p className="text-night-500">진행 시간</p>
+              <p className="text-lg font-semibold text-white">{durationMinutes}분</p>
+            </div>
+            <div>
+              <p className="text-night-500">문제 개수</p>
+              <p className="text-lg font-semibold text-white">{problemCount}개</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
         <div className="flex items-center justify-between">
-          <p className="font-semibold text-night-100">플레이어 슬롯</p>
+          <p className="text-sm font-semibold text-white">플레이어 슬롯</p>
           <div className="flex items-center gap-2 text-xs text-night-500">
             {isHost ? "방장 전용" : "관전자 모드"}
             <button
@@ -312,61 +343,72 @@ useEffect(() => {
                   setError(err?.response?.data?.detail ?? "방 나가기에 실패했습니다.");
                 }
               }}
-              className="rounded-md border border-night-700 px-3 py-1 text-xs text-night-200 transition hover:border-red-500 hover:text-red-300"
+              className="rounded-md border border-night-700 px-3 py-1 text-night-200 transition hover:border-red-500 hover:text-red-300"
             >
               방 나가기
             </button>
           </div>
         </div>
-        {["player_one", "player_two"].map((slot) => {
-          const isPlayerOne = slot === "player_one";
-          const assigned = isPlayerOne ? playerOne : playerTwo;
-          return (
-            <div
-              key={slot}
-              className="mt-3 flex flex-col gap-2 border-b border-night-900 pb-3 text-night-200 last:border-0 last:pb-0"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-night-300">{isPlayerOne ? "플레이어 1" : "플레이어 2"}</p>
-                <p className="font-semibold text-white">{playerLabel(assigned)}</p>
-              </div>
-              {isHost && (
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <select
-                    value={selectedPlayers[slot as "player_one" | "player_two"]}
-                    disabled={assigningSlot === slot}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSelectedPlayers((prev) => ({
-                        ...prev,
-                        [slot]: value,
-                      }));
-                      handleAssign(slot as "player_one" | "player_two", value);
-                    }}
-                    className="flex-1 rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
-                  >
-                    {options.map((option) => (
-                      <option key={`${slot}-${option.value || "none"}`} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+        <div className="mt-4 grid gap-3">
+          {["player_one", "player_two"].map((slot) => {
+            const isPlayerOne = slot === "player_one";
+            const assigned = isPlayerOne ? playerOne : playerTwo;
+            return (
+              <div
+                key={slot}
+                className="rounded-2xl border border-night-900/70 bg-night-950/50 p-3 text-night-200"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[12px] uppercase tracking-[0.3em] text-night-500">
+                      {isPlayerOne ? "slot a" : "slot b"}
+                    </p>
+                    <p className="text-xl font-semibold text-white">{playerLabel(assigned)}</p>
+                  </div>
+                  {isHost && (
+                    <div className="text-[10px] text-night-500">
+                      {assigningSlot === slot ? "지정 중..." : isPlayerOne ? "플레이어 1" : "플레이어 2"}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
+                {isHost && (
+                  <div className="mt-3">
+                    <select
+                      value={selectedPlayers[slot as "player_one" | "player_two"]}
+                      disabled={assigningSlot === slot}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedPlayers((prev) => ({
+                          ...prev,
+                          [slot]: value,
+                        }));
+                        handleAssign(slot as "player_one" | "player_two", value);
+                      }}
+                      className="w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+                    >
+                      {options.map((option) => (
+                        <option key={`${slot}-${option.value || "none"}`} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {isHost ? (
         <form
           onSubmit={handleStartRound}
-          className="space-y-3 rounded-lg border border-night-800 bg-night-950/50 p-4 text-sm text-night-200"
+          className="rounded-3xl border border-night-800/70 bg-night-950/45 p-5 text-night-200"
         >
-          <p className="text-night-300">
-            방장만 라운드를 시작할 수 있습니다. 목표 숫자는 관리자 페이지에서 등록한 문제 중 무작위로 선택됩니다.
+          <p className="text-xs text-night-400">
+            방장이 라운드를 시작하면 스타크래프트식 5초 카운트다운이 표시된 뒤 경기가 전체 화면으로 전환됩니다.
           </p>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <label className="space-y-1 text-night-400">
               <span>라운드 번호</span>
               <input
@@ -402,42 +444,64 @@ useEffect(() => {
               />
             </label>
           </div>
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          {success && <p className="text-sm text-green-400">{success}</p>}
+          {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+          {success && <p className="mt-1 text-sm text-emerald-300">{success}</p>}
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-indigo-600 py-2 font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
+            className="mt-4 w-full rounded-lg bg-indigo-600 py-2 font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
           >
             {submitting ? "시작 중..." : "라운드 시작"}
           </button>
         </form>
       ) : (
-        <div className="rounded-lg border border-night-800 bg-night-950/40 px-4 py-3 text-sm text-night-300">
-          방장이 라운드를 시작하면 여기에 실시간 이벤트가 표시됩니다.
+        <div className="rounded-3xl border border-night-800/70 bg-night-950/30 p-5 text-night-300">
+          방장이 "라운드 시작"을 누르면 5 → 0 카운트다운이 재생된 뒤 경기 화면이 표시됩니다.
         </div>
       )}
 
-      {spectators.length > 0 && (
-        <div className="rounded-lg border border-night-800 bg-night-950/40 p-4 text-sm text-night-200">
-          <p className="text-sm font-semibold text-night-200">관전자 {spectators.length}명</p>
-          <div className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-night-400">
-            {spectators.map((spectator) => (
-              <p key={spectator.id}>• {displayName(spectator)}</p>
-            ))}
-          </div>
+      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-white">참여자 {participantItems.length}명</p>
+          <span className="text-xs text-night-500">방장/플레이어/관전자</span>
         </div>
-      )}
+        <div className="mt-4 space-y-2 text-xs">
+          {participantItems.length === 0 && <p className="text-night-500">아직 참가자가 없습니다.</p>}
+          {participantItems.map((participant) => (
+            <div
+              key={participant.id}
+              className="flex items-center justify-between rounded-xl border border-night-900/70 bg-night-950/50 px-3 py-2"
+            >
+              <div>
+                <p className="font-semibold text-white">{participant.label}</p>
+                <p className="text-[11px] text-night-500">{participant.roleLabel}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {participant.isHost && (
+                  <span className="rounded-full border border-amber-400 px-2 py-0.5 text-[10px] text-amber-300">
+                    HOST
+                  </span>
+                )}
+                {participant.role === "player" && !participant.isHost && (
+                  <span className="rounded-full border border-emerald-500/60 px-2 py-0.5 text-[10px] text-emerald-200">
+                    PLAYER
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {events.length > 0 && (
-        <div>
-          <p className="text-sm font-semibold text-night-200">실시간 이벤트</p>
-          <div className="mt-2 max-h-64 space-y-2 overflow-y-auto rounded-lg border border-night-800 bg-night-950/40 p-3 text-xs text-night-300">
+        <div className="rounded-3xl border border-night-800/70 bg-black/60 p-4 font-mono text-xs text-emerald-200">
+          <p className="font-sans text-sm font-semibold text-night-200">실시간 로그</p>
+          <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
             {events.map((event, index) => (
-              <div key={`${event.type}-${index}`} className="rounded border border-night-800/60 bg-night-900/40 p-2">
-                <p className="font-semibold text-night-100">{event.type}</p>
-                <p className="mt-1 text-night-400">{describeEvent(event)}</p>
-              </div>
+              <p key={`${event.type}-${index}`} className="flex items-center gap-2">
+                <span className="font-sans text-[10px] text-amber-300">[{event.type}]</span>
+                <span>{describeEvent(event)}</span>
+              </p>
             ))}
           </div>
         </div>

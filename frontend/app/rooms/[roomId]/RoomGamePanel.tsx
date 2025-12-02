@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
-import type { ActiveMatch, Participant, RoundType } from "@/types/api";
+import type { ActiveMatch, Participant, RoundType, Room } from "@/types/api";
 
 type BoardSlot = "playerOne" | "playerTwo";
 
@@ -113,10 +113,7 @@ const createDefaultTeamMembers = (): TeamMemberState[] =>
   });
 
 interface Props {
-  roomId: string;
-  roundType: RoundType;
-  playerOneId?: string;
-  playerTwoId?: string;
+  room: Room;
   participants: Participant[];
 }
 
@@ -129,18 +126,16 @@ const resolveWsBase = () => {
 
 const createBoardState = (): BoardState => ({ expression: "", history: [] });
 
-export default function RoomGamePanel({
-  roomId,
-  roundType,
-  playerOneId,
-  playerTwoId,
-  participants,
-}: Props) {
+export default function RoomGamePanel({ room, participants }: Props) {
+  const roomId = room.id;
+  const roundType: RoundType = room.round_type;
+  const initialPlayerOne = room.player_one_id ?? undefined;
+  const initialPlayerTwo = room.player_two_id ?? undefined;
   const { user } = useAuth();
   const router = useRouter();
   const isTeamRound = roundType === "round2_team";
-  const [playerOne, setPlayerOne] = useState<string | undefined>(playerOneId ?? undefined);
-  const [playerTwo, setPlayerTwo] = useState<string | undefined>(playerTwoId ?? undefined);
+  const [playerOne, setPlayerOne] = useState<string | undefined>(initialPlayerOne);
+  const [playerTwo, setPlayerTwo] = useState<string | undefined>(initialPlayerTwo);
   const [boards, setBoards] = useState<{ playerOne: BoardState; playerTwo: BoardState }>({
     playerOne: createBoardState(),
     playerTwo: createBoardState(),
@@ -166,21 +161,21 @@ export default function RoomGamePanel({
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
 
   const playerIdsRef = useRef<{ playerOne: string | undefined; playerTwo: string | undefined }>({
-    playerOne: playerOneId ?? undefined,
-    playerTwo: playerTwoId ?? undefined,
+    playerOne: initialPlayerOne,
+    playerTwo: initialPlayerTwo,
   });
 
   useEffect(() => {
-    const next = playerOneId ?? undefined;
+    const next = room.player_one_id ?? undefined;
     playerIdsRef.current.playerOne = next;
     setPlayerOne(next);
-  }, [playerOneId]);
+  }, [room.player_one_id]);
 
   useEffect(() => {
-    const next = playerTwoId ?? undefined;
+    const next = room.player_two_id ?? undefined;
     playerIdsRef.current.playerTwo = next;
     setPlayerTwo(next);
-  }, [playerTwoId]);
+  }, [room.player_two_id]);
 
   useEffect(() => {
     setParticipantState(participants);
@@ -200,7 +195,7 @@ export default function RoomGamePanel({
     return data;
   };
 
-  const { data, mutate, isLoading } = useSWR(user ? `/rooms/${roomId}/active-match` : null, fetcher, {
+  const { data, mutate } = useSWR(user ? `/rooms/${roomId}/active-match` : null, fetcher, {
     refreshInterval: 15000,
     revalidateOnFocus: true,
   });
@@ -281,10 +276,13 @@ export default function RoomGamePanel({
     if (countdownTimerRef.current) {
       clearInterval(countdownTimerRef.current);
     }
-    setPreCountdown(3);
+    setPreCountdown(5);
     countdownTimerRef.current = setInterval(() => {
       setPreCountdown((prev) => {
-        if (prev === null || prev <= 1) {
+        if (prev === null) {
+          return prev;
+        }
+        if (prev <= 0) {
           if (countdownTimerRef.current) {
             clearInterval(countdownTimerRef.current);
             countdownTimerRef.current = null;
@@ -325,6 +323,80 @@ export default function RoomGamePanel({
       return userId.slice(0, 6);
     },
     [participantState],
+  );
+
+  const roundLabel = roundType === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
+
+  const slotSubtitle = useCallback(
+    (participant?: Participant) => {
+      if (!participant) return "연결 대기";
+      if (participant.user_id === room.host_id) return "방장";
+      if (participant.user_id === playerOne) return "플레이어 1";
+      if (participant.user_id === playerTwo) return "플레이어 2";
+      return participant.role === "player" ? "지정 플레이어" : "관전자";
+    },
+    [playerOne, playerTwo, room.host_id],
+  );
+
+  const friendlyRoster = useMemo(() => {
+    const picked: Participant[] = [];
+    const pushUnique = (participant?: Participant) => {
+      if (!participant) return;
+      if (picked.some((item) => item.user_id === participant.user_id)) return;
+      picked.push(participant);
+    };
+    pushUnique(participantState.find((p) => p.user_id === room.host_id));
+    pushUnique(participantState.find((p) => p.user_id === playerOne));
+    pushUnique(participantState.find((p) => p.user_id === playerTwo));
+    participantState
+      .filter((p) => p.role === "player")
+      .forEach((player) => pushUnique(player));
+    return picked;
+  }, [participantState, room.host_id, playerOne, playerTwo]);
+
+  const enemyRoster = useMemo(
+    () =>
+      participantState.filter(
+        (p) => p.role !== "player" && p.user_id !== room.host_id,
+      ),
+    [participantState, room.host_id],
+  );
+
+  const createSlotEntries = useCallback(
+    (roster: Participant[], type: "friendly" | "enemy"): LobbySlotEntry[] => {
+      const accent = type === "friendly" ? "emerald" : "red";
+      const slots = roster.slice(0, 6).map((participant, index) => ({
+        key: participant.id,
+        label: participantLabel(participant.user_id),
+        subtitle: slotSubtitle(participant),
+        ready: participant.is_ready,
+        isHost: participant.user_id === room.host_id,
+        empty: false,
+        accent,
+        power: Math.min(100, ((participant.score ?? 0) % 70) + 25 + index * 3),
+      }));
+      while (slots.length < 6) {
+        slots.push({
+          key: `${type}-empty-${slots.length}`,
+          label: type === "friendly" ? "플레이어 슬롯 비어 있음" : "관전자 대기 슬롯",
+          subtitle: "연결 대기",
+          empty: true,
+          accent,
+          power: 12,
+        });
+      }
+      return slots;
+    },
+    [participantLabel, room.host_id, slotSubtitle],
+  );
+
+  const friendlySlots = useMemo(
+    () => createSlotEntries(friendlyRoster, "friendly"),
+    [createSlotEntries, friendlyRoster],
+  );
+  const enemySlots = useMemo(
+    () => createSlotEntries(enemyRoster, "enemy"),
+    [createSlotEntries, enemyRoster],
   );
 
   const handleLeaveRoom = useCallback(async () => {
@@ -672,15 +744,19 @@ export default function RoomGamePanel({
         return "hidden";
       })
     : [];
+  const lobbyShellClass =
+    "relative space-y-6 rounded-[30px] border border-night-800/80 bg-[rgba(5,10,20,0.85)] p-6 text-night-100 shadow-[0_25px_70px_rgba(0,0,0,0.6)]";
+
   const containerClass = isPlayerView
-    ? "fixed inset-0 z-40 flex flex-col bg-night-950 px-4 py-6 text-white"
+    ? "fixed inset-0 z-40 flex flex-col bg-[#050a15] px-4 py-6 text-white"
     : hasActiveMatch
-      ? "fixed inset-0 z-40 overflow-y-auto bg-night-950/95 p-6 space-y-4"
-    : "card space-y-4";
+      ? "fixed inset-0 z-40 overflow-y-auto bg-[#050a15]/95 p-6 space-y-4"
+      : lobbyShellClass;
 
   if (isPlayerView && activeMatch) {
     return (
-      <div className={containerClass}>
+      <div className={`${containerClass} relative`}>
+        {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
         <div className="mb-3 flex justify-end">{renderLeaveButton()}</div>
         <div className="grid gap-3 rounded-2xl border-2 border-amber-400/60 bg-night-900/60 p-5 text-sm text-night-200 sm:grid-cols-3">
           <div>
@@ -708,12 +784,6 @@ export default function RoomGamePanel({
         </div>
         {statusMessage && <p className="text-sm text-green-400">{statusMessage}</p>}
         {statusError && <p className="text-sm text-red-400">{statusError}</p>}
-        {preCountdown !== null && (
-          <div className="rounded-2xl border border-indigo-500/70 bg-night-900/60 p-6 text-center text-white">
-            <p className="text-sm text-night-400">라운드 시작 준비</p>
-            <p className="text-5xl font-bold text-indigo-200">{preCountdown}</p>
-          </div>
-        )}
         <div className="flex flex-1 items-center">
           <div className="w-full">
             {visibleSlots.map((slot) => {
@@ -760,31 +830,118 @@ export default function RoomGamePanel({
     );
   }
 
+  if (!hasActiveMatch) {
+    const spectatorCount = participantState.filter((p) => p.role !== "player").length;
+    const readyCount = participantState.filter((p) => p.is_ready).length;
+    const hostLabel = participantLabel(room.host_id);
+    return (
+      <div className={lobbyShellClass}>
+        {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-night-800/60 pb-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.45em] text-night-500">ROOM LOBBY</p>
+            <h2 className="text-3xl font-black text-white">{room.name}</h2>
+            <p className="text-sm text-night-400">
+              {roundLabel} · 방 코드 <span className="font-mono text-emerald-300">{room.code}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full border border-amber-400/60 px-4 py-1 text-xs font-semibold tracking-[0.45em] text-amber-200">
+              대기 중
+            </span>
+            {renderLeaveButton()}
+          </div>
+        </div>
+        {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
+        <div className="mt-6 grid gap-6 lg:grid-cols-[3fr,2fr]">
+          <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <LobbySlotColumn title="Sunken Warriors" accent="emerald" slots={friendlySlots} />
+              <LobbySlotColumn title="Enemies" accent="red" slots={enemySlots} />
+            </div>
+            <div className="rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-xs text-night-300">
+              <div className="grid gap-3 text-sm text-night-300 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <p className="text-night-500">참가자</p>
+                  <p className="text-lg font-semibold text-white">{participantState.length}명</p>
+                </div>
+                <div>
+                  <p className="text-night-500">관전자</p>
+                  <p className="text-lg font-semibold text-white">{spectatorCount}명</p>
+                </div>
+                <div>
+                  <p className="text-night-500">준비 완료</p>
+                  <p className="text-lg font-semibold text-emerald-300">{readyCount}명</p>
+                </div>
+                <div>
+                  <p className="text-night-500">최대 인원</p>
+                  <p className="text-lg font-semibold text-white">{room.max_players}명</p>
+                </div>
+                <div>
+                  <p className="text-night-500">호스트</p>
+                  <p className="text-lg font-semibold text-white">{hostLabel}</p>
+                </div>
+                <div>
+                  <p className="text-night-500">현재 라운드</p>
+                  <p className="text-lg font-semibold text-white">{room.current_round}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-night-800/70 bg-night-950/30 p-4 text-sm">
+              <p className="text-xs uppercase tracking-[0.35em] text-night-500">상태 콘솔</p>
+              <div className="mt-3 space-y-2 text-night-200">
+                {statusMessage ? (
+                  <p className="text-emerald-300">• {statusMessage}</p>
+                ) : (
+                  <p className="text-night-500">방장이 라운드를 시작하면 스타크래프트식 카운트다운이 표시됩니다.</p>
+                )}
+                {statusError && <p className="text-red-300">• {statusError}</p>}
+              </div>
+            </div>
+            {roundOutcome && (
+              <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+                <p className="font-semibold">
+                  {roundOutcome.reason === "timeout"
+                    ? "시간 종료 결과"
+                    : roundOutcome.reason === "forfeit"
+                      ? "기권 처리"
+                      : "직전 라운드 결과"}
+                </p>
+                <p className="mt-1">
+                  승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
+                </p>
+                {typeof roundOutcome.distance === "number" && (
+                  <p className="text-xs text-amber-200/70">목표와의 차이 {roundOutcome.distance}</p>
+                )}
+              </div>
+            )}
+            <div className="rounded-2xl border border-night-800/80 bg-night-950/30 p-4 text-xs text-night-400">
+              <p className="font-semibold text-night-100">라운드 개시 안내</p>
+              <p className="mt-2">
+                방장이 <span className="text-emerald-300">라운드 시작</span>을 누르면 5 → 0 카운트다운이 표시되고,
+                0이 되면 즉시 전장 화면으로 전환됩니다.
+              </p>
+              <p className="mt-2">카운트다운 동안 플레이어는 식 입력창이 잠긴 상태로 준비 시간을 가집니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={containerClass}>
+    <div className={`${containerClass} relative`}>
+      {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-white">실시간 경기</h2>
         <div className="flex items-center gap-2">
-          <span
-            className={`rounded-full border px-3 py-0.5 text-xs ${
-              hasActiveMatch ? "border-emerald-500 text-emerald-300" : "border-night-700 text-night-400"
-            }`}
-          >
-            {hasActiveMatch ? "진행 중" : "대기 중"}
-          </span>
+          <span className="rounded-full border border-emerald-500 px-3 py-0.5 text-xs text-emerald-300">진행 중</span>
           {renderLeaveButton()}
         </div>
       </div>
       {!user && <p className="text-sm text-night-400">로그인 후 이용할 수 있습니다.</p>}
-
-      {!hasActiveMatch && !isLoading && (
-        <div className="rounded-lg border border-night-800 bg-night-950/40 p-5 text-sm text-night-300">
-          <p className="font-semibold text-night-100">아직 라운드가 시작되지 않았습니다.</p>
-          <p className="mt-2 text-night-400">
-            방장이 두 명의 플레이어를 지정하고 라운드를 시작하면 게임 화면이 전체에 표시됩니다.
-          </p>
-        </div>
-      )}
 
       {statusMessage && <p className="text-sm text-green-400">{statusMessage}</p>}
       {statusError && <p className="text-sm text-red-400">{statusError}</p>}
@@ -807,70 +964,59 @@ export default function RoomGamePanel({
         </div>
       )}
 
-      {hasActiveMatch && (
-        <>
-          {preCountdown !== null && (
-            <div className="rounded-xl border border-indigo-500/70 bg-night-900/60 p-4 text-center text-white">
-              <p className="text-sm text-night-400">라운드 시작까지</p>
-              <p className="text-4xl font-bold text-indigo-200">{preCountdown}</p>
-            </div>
-          )}
-
-          <div className="grid gap-3 rounded-lg border border-night-800/60 bg-night-950/40 p-4 text-sm text-night-200 sm:grid-cols-2">
-            <div>
-              <p className="text-night-500">현재 문제</p>
-              <p className="text-2xl font-bold text-white">{activeMatch?.target_number ?? "-"}</p>
-            </div>
-            <div>
-              <p className="text-night-500">남은 시간</p>
-              <p className={`text-3xl font-bold ${isCountdownCritical ? "text-red-400" : "text-indigo-300"}`}>
-                {formattedRemaining}
-              </p>
-              <div className="mt-2 h-2 w-full rounded-full bg-night-900">
-                <div
-                  className={`h-full rounded-full ${isCountdownCritical ? "bg-red-500" : "bg-indigo-500"}`}
-                  style={{ width: `${countdownPercent * 100}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <p className="text-night-500">최적 코스트</p>
-              <p className="text-xl font-semibold text-night-100">{activeMatch?.optimal_cost ?? "-"}</p>
-            </div>
-            <div>
-              <p className="text-night-500">문제 진행도</p>
-              <p className="text-xl font-semibold text-night-100">
-                {activeMatch ? `${activeMatch.current_index + 1} / ${activeMatch.total_problems}` : "-"}
-              </p>
-            </div>
+      <div className="grid gap-3 rounded-lg border border-night-800/60 bg-night-950/40 p-4 text-sm text-night-200 sm:grid-cols-2">
+        <div>
+          <p className="text-night-500">현재 문제</p>
+          <p className="text-2xl font-bold text-white">{activeMatch?.target_number ?? "-"}</p>
+        </div>
+        <div>
+          <p className="text-night-500">남은 시간</p>
+          <p className={`text-3xl font-bold ${isCountdownCritical ? "text-red-400" : "text-indigo-300"}`}>
+            {formattedRemaining}
+          </p>
+          <div className="mt-2 h-2 w-full rounded-full bg-night-900">
+            <div
+              className={`h-full rounded-full ${isCountdownCritical ? "bg-red-500" : "bg-indigo-500"}`}
+              style={{ width: `${countdownPercent * 100}%` }}
+            />
           </div>
+        </div>
+        <div>
+          <p className="text-night-500">최적 코스트</p>
+          <p className="text-xl font-semibold text-night-100">{activeMatch?.optimal_cost ?? "-"}</p>
+        </div>
+        <div>
+          <p className="text-night-500">문제 진행도</p>
+          <p className="text-xl font-semibold text-night-100">
+            {activeMatch ? `${activeMatch.current_index + 1} / ${activeMatch.total_problems}` : "-"}
+          </p>
+        </div>
+      </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {visibleSlots.map((slot) => {
-              const isMine = mySlot === slot;
-              const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
-              return (
-                <PlayerPanel
-                  key={slot}
-                  title={slot === "playerOne" ? "플레이어 1" : "플레이어 2"}
-                  userLabel={participantLabel(assignedUser)}
-                  expression={boards[slot].expression}
-                  history={boards[slot].history}
-                  onExpressionChange={isMine ? (value) => handleExpressionChange(slot, value) : undefined}
-                  onSubmit={isMine ? () => submitExpression(slot) : undefined}
-                  onFocus={isMine ? armAudio : undefined}
-                  disabled={!activeMatch || !assignedUser}
-                  isMine={isMine}
-                  submitting={submittingSlot === slot}
-                  placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
-                  warningMessage={inputWarnings[slot]}
-                  focusLayout={Boolean(mySlot)}
-                />
-              );
-            })}
-          </div>
-        </>
-      )}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {visibleSlots.map((slot) => {
+          const isMine = mySlot === slot;
+          const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
+          return (
+            <PlayerPanel
+              key={slot}
+              title={slot === "playerOne" ? "플레이어 1" : "플레이어 2"}
+              userLabel={participantLabel(assignedUser)}
+              expression={boards[slot].expression}
+              history={boards[slot].history}
+              onExpressionChange={isMine ? (value) => handleExpressionChange(slot, value) : undefined}
+              onSubmit={isMine ? () => submitExpression(slot) : undefined}
+              onFocus={isMine ? armAudio : undefined}
+              disabled={!activeMatch || !assignedUser}
+              isMine={isMine}
+              submitting={submittingSlot === slot}
+              placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
+              warningMessage={inputWarnings[slot]}
+              focusLayout={Boolean(mySlot)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1223,6 +1369,75 @@ function PlayerPanel({
             </div>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface LobbySlotEntry {
+  key: string;
+  label: string;
+  subtitle: string;
+  ready?: boolean;
+  isHost?: boolean;
+  empty?: boolean;
+  accent: "emerald" | "red";
+  power: number;
+}
+
+interface LobbySlotColumnProps {
+  title: string;
+  accent: "emerald" | "red";
+  slots: LobbySlotEntry[];
+}
+
+function LobbySlotColumn({ title, accent, slots }: LobbySlotColumnProps) {
+  const accentText = accent === "emerald" ? "text-emerald-300" : "text-red-300";
+  const barColor = accent === "emerald" ? "bg-emerald-400" : "bg-red-400";
+  const readyBadge =
+    accent === "emerald" ? "border-emerald-400/70 text-emerald-200" : "border-red-400/70 text-red-200";
+  const idleBadge =
+    accent === "emerald" ? "border-emerald-800/60 text-emerald-300/70" : "border-red-800/60 text-red-200/70";
+  return (
+    <div className="rounded-2xl border border-night-800/80 bg-night-900/40 p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm font-semibold text-white">{title}</p>
+        <span className={`text-[10px] tracking-[0.35em] ${accentText}`}>READY</span>
+      </div>
+      <div className="space-y-2">
+        {slots.map((slot) => (
+          <div
+            key={slot.key}
+            className={`rounded-xl border border-night-800/70 bg-night-950/40 px-3 py-2 text-sm ${
+              slot.empty ? "opacity-50" : ""
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-white">{slot.label}</p>
+              {!slot.empty && (
+                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${slot.ready ? readyBadge : idleBadge}`}>
+                  {slot.ready ? "READY" : "WAIT"}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-night-500">{slot.subtitle}</p>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-night-950/70">
+              <div className={`${barColor} h-full`} style={{ width: `${slot.power}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CountdownOverlay({ value }: { value: number }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-2 rounded-full border-2 border-amber-400/70 bg-black/70 px-10 py-8 text-center">
+        <p className="text-xs uppercase tracking-[0.6em] text-amber-200/80">COUNTDOWN</p>
+        <p className="text-6xl font-black text-amber-300 drop-shadow-[0_0_25px_rgba(247,223,173,0.65)]">{value}</p>
+        <p className="text-[12px] text-amber-100/80">라운드 준비 중</p>
       </div>
     </div>
   );
