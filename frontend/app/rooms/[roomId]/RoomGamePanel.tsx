@@ -650,8 +650,8 @@ export default function RoomGamePanel({
             <p className="text-5xl font-bold text-indigo-200">{preCountdown}</p>
           </div>
         )}
-        <div className="flex flex-1 items-center justify-center">
-          <div className="w-full max-w-4xl">
+        <div className="flex flex-1 items-center">
+          <div className="w-full">
             {visibleSlots.map((slot) => {
               const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
               const isMine = mySlot === slot;
@@ -684,7 +684,7 @@ export default function RoomGamePanel({
                   disabled={!activeMatch || !assignedUser}
                   isMine={isMine}
                   submitting={submittingSlot === slot}
-                  placeholder={slot === "playerOne" ? "예: (1+2)*3" : "예: (1+3)*2"}
+                  placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
                   warningMessage={inputWarnings[slot]}
                   focusLayout
                 />
@@ -791,7 +791,7 @@ export default function RoomGamePanel({
                   disabled={!activeMatch || !assignedUser}
                   isMine={isMine}
                   submitting={submittingSlot === slot}
-                  placeholder={slot === "playerOne" ? "예: (1+2)*3" : "예: (1+3)*2"}
+                  placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
                   warningMessage={inputWarnings[slot]}
                   focusLayout={Boolean(mySlot)}
                 />
