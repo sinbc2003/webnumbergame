@@ -380,6 +380,8 @@ export default function RoomGamePanel({ room, participants }: Props) {
           key: `${type}-empty-${slots.length}`,
           label: type === "friendly" ? "플레이어 슬롯 비어 있음" : "관전자 대기 슬롯",
           subtitle: "연결 대기",
+          ready: false,
+          isHost: false,
           empty: true,
           accent,
           power: 12,
