@@ -8,6 +8,7 @@ import clsx from "clsx";
 import { useAuth } from "@/hooks/useAuth";
 import { useLobby } from "@/hooks/useLobby";
 import { ShellTransitionProvider } from "@/hooks/useShellTransition";
+import { getRuntimeConfig } from "@/lib/runtimeConfig";
 
 type NavButton = {
   id: string;
@@ -25,8 +26,6 @@ const NAV_BUTTONS: NavButton[] = [
 ];
 
 const ADMIN_BUTTON: NavButton = { id: "ops", label: "관리", hint: "ADMIN", href: "/admin" };
-const BADGE_SEQUENCE = ["gm", "diamond", "platinum", "gold", "silver", "bronze"];
-
 type LayoutMode = "lobby" | "focus";
 
 interface Props {
@@ -64,12 +63,46 @@ export default function MathNetworkShell({
   const showContent = Boolean(children);
   const shouldShowConsole = showChat || !showContent;
   const isFocus = layout === "focus";
+  const [scoreMap, setScoreMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const { apiBase } = getRuntimeConfig();
+    fetch(`${apiBase}/dashboard/leaderboard`, {
+      cache: "no-store",
+      signal: controller.signal,
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = await res.json();
+        const entries = data?.entries ?? [];
+        const map: Record<string, number> = {};
+        entries.forEach((entry: any) => {
+          if (entry?.user_id) {
+            map[entry.user_id] = entry.total_score ?? entry.performance_score ?? 0;
+          }
+        });
+        setScoreMap(map);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
+
+  const badgeFromScore = (score: number) => {
+    if (score >= 500) return "platinum";
+    if (score >= 400) return "ruby";
+    if (score >= 300) return "diamond";
+    if (score >= 200) return "gold";
+    if (score >= 100) return "silver";
+    return "bronze";
+  };
 
   const navButtons = useMemo(() => {
     if (user?.is_admin) {
@@ -85,15 +118,12 @@ export default function MathNetworkShell({
   const decoratedRoster = useMemo(() => {
     if (!roster.length) return [];
     return roster.map((entry, index) => {
-      const badge = BADGE_SEQUENCE[index % BADGE_SEQUENCE.length];
-      const signal = (entry.username?.charCodeAt(0) ?? index) % 4;
-      return {
-        ...entry,
-        badge,
-        signal: signal + 1,
-      };
+      const score = scoreMap[entry.user_id] ?? 0;
+      const badge = badgeFromScore(score);
+      const signal = ((entry.username?.charCodeAt(0) ?? index) % 4) + 1;
+      return { ...entry, badge, signal, score };
     });
-  }, [roster]);
+  }, [roster, scoreMap]);
 
   const clearTimers = () => {
     if (transitionTimerRef.current) {
@@ -266,12 +296,14 @@ export default function MathNetworkShell({
               {decoratedRoster.length === 0 && <li className="bnet-roster__empty">접속 중인 사령관이 없습니다.</li>}
               {decoratedRoster.map((player) => (
                 <li key={player.user_id} className="bnet-roster__item">
-                  <div>
-                    <p className="bnet-roster__name">{player.username}</p>
-                    <p className="bnet-roster__clan">{player.user_id.slice(0, 8)}</p>
+                  <div className="bnet-roster__identity">
+                    <span className={clsx("bnet-roster__badge", `badge-${player.badge}`)} />
+                    <div>
+                      <p className="bnet-roster__name">{player.username}</p>
+                      <p className="bnet-roster__clan">{player.user_id.slice(0, 8)}</p>
+                    </div>
                   </div>
                   <div className="bnet-roster__meta">
-                    <span className={clsx("bnet-roster__badge", `badge-${player.badge}`)} />
                     <div className="bnet-roster__signal">
                       {Array.from({ length: 4 }).map((_, index) => (
                         <span key={index} className={clsx("bar", index < player.signal && "active")} />
