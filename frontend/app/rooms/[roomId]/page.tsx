@@ -33,7 +33,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
 
   if (!room) {
     return (
-      <TopNav pageTitle="Channel Offline" description="선택한 방을 찾을 수 없습니다.">
+      <TopNav pageTitle="Channel Offline" description="선택한 방을 찾을 수 없습니다." showChat={false}>
         <main className="mx-auto max-w-xl py-10 text-center text-white">
           <p>방을 찾을 수 없습니다.</p>
           <Link href="/rooms" className="text-indigo-300 underline">
@@ -50,6 +50,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
     <TopNav
       pageTitle={`Room · ${room.name}`}
       description={`방 코드 ${room.code} · ${roundLabel} · 현재 ${participants.length}명`}
+      showChat={false}
     >
       <main className="mx-auto max-w-6xl py-6">
         <div className="grid gap-6 lg:grid-cols-[2.2fr,1fr]">

@@ -7,6 +7,7 @@ import clsx from "clsx";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useLobby } from "@/hooks/useLobby";
+import { ShellTransitionProvider } from "@/hooks/useShellTransition";
 
 type NavButton = {
   id: string;
@@ -30,6 +31,7 @@ interface Props {
   children?: ReactNode;
   pageTitle?: string;
   description?: string;
+  showChat?: boolean;
 }
 
 const formatTime = (value: string) => {
@@ -40,7 +42,12 @@ const formatTime = (value: string) => {
   return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 };
 
-export default function MathNetworkShell({ children, pageTitle = "MathGame Command", description }: Props) {
+export default function MathNetworkShell({
+  children,
+  pageTitle = "MathGame Command",
+  description,
+  showChat = true,
+}: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -51,6 +58,7 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
   const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showContent = Boolean(children);
+  const shouldShowConsole = showChat || !showContent;
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -171,45 +179,55 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
             })}
           </aside>
           <main className="bnet-main">
-            <section className={clsx("bnet-console", !showContent && "bnet-console--full")}>
-              <div className="bnet-console__header">
-                <div>
-                  <p className="bnet-console__title">{pageTitle}</p>
-                  <p className="bnet-console__desc">{description ?? "채널 MathNet-01 연결됨 · 전체 채팅 활성화"}</p>
+            {shouldShowConsole && (
+              <section className={clsx("bnet-console", !showContent && "bnet-console--full", !showChat && "bnet-console--compact")}>
+                <div className="bnet-console__header">
+                  <div>
+                    <p className="bnet-console__title">{pageTitle}</p>
+                    <p className="bnet-console__desc">
+                      {description ?? (showChat ? "채널 MathNet-01 연결됨 · 전체 채팅 활성화" : "작전 채널 전환됨")}
+                    </p>
+                  </div>
+                  <div className={clsx("bnet-console__chip", connected ? "chip-online" : "chip-offline")}>
+                    {connected ? "CHANNEL ONLINE" : "CONNECTING"}
+                  </div>
                 </div>
-                <div className={clsx("bnet-console__chip", connected ? "chip-online" : "chip-offline")}>
-                  {connected ? "CHANNEL ONLINE" : "CONNECTING"}
-                </div>
-              </div>
-              <div className="bnet-chat">
-                <div className="bnet-chat__log" ref={chatScrollRef}>
-                  {messages.length === 0 ? (
-                    <p className="bnet-chat__placeholder">아직 메시지가 없습니다. 첫 채팅을 입력해 보세요.</p>
-                  ) : (
-                    messages.map((entry) => (
-                      <div key={entry.id} className="bnet-chat__line">
-                        <span className="bnet-chat__time">{formatTime(entry.timestamp)}</span>
-                        <span className="bnet-chat__author">{entry.user}</span>
-                        <span className="bnet-chat__message">{entry.message}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <form className="bnet-chat__form" onSubmit={handleChatSubmit}>
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(event) => setChatInput(event.target.value)}
-                    placeholder={connected ? "채널에 메시지 보내기" : "연결 중..."}
-                    disabled={chatDisabled}
-                  />
-                  <button type="submit" disabled={chatDisabled || !chatInput.trim()}>
-                    Send
-                  </button>
-                </form>
-              </div>
-            </section>
-            {showContent && <section className="bnet-content">{children}</section>}
+                {showChat && (
+                  <div className="bnet-chat">
+                    <div className="bnet-chat__log" ref={chatScrollRef}>
+                      {messages.length === 0 ? (
+                        <p className="bnet-chat__placeholder">아직 메시지가 없습니다. 첫 채팅을 입력해 보세요.</p>
+                      ) : (
+                        messages.map((entry) => (
+                          <div key={entry.id} className="bnet-chat__line">
+                            <span className="bnet-chat__time">{formatTime(entry.timestamp)}</span>
+                            <span className="bnet-chat__author">{entry.user}</span>
+                            <span className="bnet-chat__message">{entry.message}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <form className="bnet-chat__form" onSubmit={handleChatSubmit}>
+                      <input
+                        type="text"
+                        value={chatInput}
+                        onChange={(event) => setChatInput(event.target.value)}
+                        placeholder={connected ? "채널에 메시지 보내기" : "연결 중..."}
+                        disabled={chatDisabled}
+                      />
+                      <button type="submit" disabled={chatDisabled || !chatInput.trim()}>
+                        Send
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </section>
+            )}
+            {showContent && (
+              <ShellTransitionProvider value={runTransition}>
+                <section className={clsx("bnet-content", !showChat && "bnet-content--full")}>{children}</section>
+              </ShellTransitionProvider>
+            )}
           </main>
           <aside className="bnet-roster">
             <div className="bnet-roster__title">

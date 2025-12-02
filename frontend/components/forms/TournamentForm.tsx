@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 
 import api from "@/lib/api";
 import type { Tournament } from "@/types/api";
+import { useShellTransition } from "@/hooks/useShellTransition";
 
 export default function TournamentForm() {
   const router = useRouter();
+  const transition = useShellTransition();
   const [name, setName] = useState("");
   const [slots, setSlots] = useState(8);
   const [loading, setLoading] = useState(false);
@@ -20,10 +22,10 @@ export default function TournamentForm() {
     try {
       const { data } = await api.post<Tournament>("/tournaments", {
         name,
-        participant_slots: slots
+        participant_slots: slots,
       });
       setMessage("토너먼트가 생성되었습니다.");
-      router.push(`/tournaments/${data.id}`);
+      transition(() => router.push(`/tournaments/${data.id}`));
     } catch (error: any) {
       setMessage(error?.response?.data?.detail ?? "생성에 실패했습니다.");
     } finally {

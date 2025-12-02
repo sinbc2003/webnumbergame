@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import api from "@/lib/api";
 import type { Room, RoundType } from "@/types/api";
+import { useShellTransition } from "@/hooks/useShellTransition";
 
 interface Props {
   onCreated?: (room: Room) => void;
@@ -12,6 +13,7 @@ interface Props {
 
 export default function RoomForm({ onCreated }: Props) {
   const router = useRouter();
+  const transition = useShellTransition();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<RoundType>("round1_individual");
@@ -26,11 +28,11 @@ export default function RoomForm({ onCreated }: Props) {
       const { data } = await api.post<Room>("/rooms", {
         name,
         description,
-        round_type: mode
+        round_type: mode,
       });
       setStatusMessage("방이 생성되었습니다.");
       onCreated?.(data);
-      router.push(`/rooms/${data.id}`);
+      transition(() => router.push(`/rooms/${data.id}`));
     } catch (error: any) {
       setStatusMessage(error?.response?.data?.detail ?? "방 생성에 실패했습니다.");
     } finally {

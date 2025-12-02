@@ -197,6 +197,10 @@ body {
   min-height: 520px;
 }
 
+.bnet-console--compact {
+  min-height: auto;
+}
+
 .bnet-console__header {
   display: flex;
   justify-content: space-between;
@@ -349,6 +353,10 @@ body {
   box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.55);
   min-height: 320px;
   transition: transform 0.45s ease, opacity 0.45s ease;
+}
+
+.bnet-content--full {
+  min-height: 520px;
 }
 
 .bnet-roster {
