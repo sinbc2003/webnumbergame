@@ -2,15 +2,17 @@
 
 import { SWRConfig } from "swr";
 
+import { LobbyProvider } from "@/hooks/useLobby";
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SWRConfig
       value={{
         shouldRetryOnError: false,
-        revalidateOnFocus: true
+        revalidateOnFocus: true,
       }}
     >
-      {children}
+      <LobbyProvider>{children}</LobbyProvider>
     </SWRConfig>
   );
 }

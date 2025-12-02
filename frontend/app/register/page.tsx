@@ -1,13 +1,16 @@
-import TopNav from "@/components/TopNav";
 import AuthForm from "@/components/forms/AuthForm";
 
 export default function RegisterPage() {
   return (
-    <TopNav pageTitle="Commander Registration" description="신규 사령관 계정 발급 · LEVEL 1 CLEARANCE">
-      <main className="mx-auto flex max-w-3xl justify-center py-10">
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md space-y-4">
+        <div className="text-center">
+          <p className="text-[10px] uppercase tracking-[0.5em] text-night-400">MATHGAME NETWORK</p>
+          <p className="text-sm text-night-300">새 사령관 계정을 생성하세요.</p>
+        </div>
         <AuthForm mode="register" />
-      </main>
-    </TopNav>
+      </div>
+    </div>
   );
 }
 

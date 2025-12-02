@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useLobby } from "@/hooks/useLobby";
 
 type NavButton = {
   id: string;
@@ -16,40 +17,43 @@ type NavButton = {
 };
 
 const NAV_BUTTONS: NavButton[] = [
-  { id: "channel", label: "Channel", hint: "KOR-1", href: "/dashboard" },
-  { id: "friends", label: "Friends", hint: "COMMS", href: "/rooms" },
-  { id: "create", label: "Create", hint: "OPS", href: "/tournaments/create" },
-  { id: "join", label: "Join", hint: "MATCH", href: "/rooms" },
+  { id: "channel", label: "Channel", hint: "HOME", href: "/dashboard" },
+  { id: "rooms", label: "Rooms", hint: "MATCH", href: "/rooms" },
+  { id: "forge", label: "Forge", hint: "BUILD", href: "/tournaments/create" },
   { id: "league", label: "League", hint: "RANK", href: "/tournaments" },
-  { id: "quit", label: "Quit", hint: "EXIT", action: "quit" }
+  { id: "quit", label: "Quit", hint: "EXIT", action: "quit" },
 ];
 
 const ADMIN_BUTTON: NavButton = { id: "ops", label: "Ops", hint: "ADMIN", href: "/admin" };
-
-const ROSTER_PRESET = [
-  { name: "IllltoSsIlllll", clan: "9990", rank: "gm", signal: 4 },
-  { name: "Dunhil[joa]", clan: "S2", rank: "diamond", signal: 4 },
-  { name: "SinBu-N.SJ[S2]", clan: "S2", rank: "diamond", signal: 3 },
-  { name: "Oppa", clan: "CASL", rank: "platinum", signal: 3 },
-  { name: "pol.bbo", clan: "GDI", rank: "gold", signal: 2 },
-  { name: "Gore777.a010", clan: "DMG", rank: "silver", signal: 4 },
-  { name: "okbarigirl", clan: "S.C", rank: "gold", signal: 3 },
-  { name: "1041503", clan: "N/A", rank: "bronze", signal: 2 },
-  { name: "Kristy", clan: "GG", rank: "gold", signal: 3 },
-  { name: "Gore777.a002", clan: "DMG", rank: "silver", signal: 2 }
-];
+const BADGE_SEQUENCE = ["gm", "diamond", "platinum", "gold", "silver", "bronze"];
 
 interface Props {
   children: ReactNode;
   pageTitle?: string;
   description?: string;
-  logLines?: string[];
 }
 
-export default function BattleNetShell({ children, pageTitle = "Sunken Warriors", description, logLines }: Props) {
+const formatTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "--:--";
+  }
+  return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+};
+
+export default function MathNetworkShell({ children, pageTitle = "MathGame Command", description }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { messages, roster, connected, sendMessage } = useLobby();
+  const [chatInput, setChatInput] = useState("");
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   const navButtons = useMemo(() => {
     if (user?.is_admin) {
@@ -62,44 +66,18 @@ export default function BattleNetShell({ children, pageTitle = "Sunken Warriors"
     return NAV_BUTTONS;
   }, [user?.is_admin]);
 
-  const stats = useMemo(() => {
-    const now = new Date();
-    const usersOnline = 29151 + now.getMinutes() * 11;
-    const activeGames = 6700 + (now.getSeconds() % 30) * 7;
-    const lastCheck = now.toLocaleString("ko-KR", {
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit"
+  const decoratedRoster = useMemo(() => {
+    if (!roster.length) return [];
+    return roster.map((entry, index) => {
+      const badge = BADGE_SEQUENCE[index % BADGE_SEQUENCE.length];
+      const signal = (entry.username?.charCodeAt(0) ?? index) % 4;
+      return {
+        ...entry,
+        badge,
+        signal: signal + 1,
+      };
     });
-    return { usersOnline, activeGames, lastCheck };
-  }, []);
-
-  const roster = useMemo(() => {
-    if (!user) return ROSTER_PRESET;
-    const copy = [...ROSTER_PRESET];
-    copy.splice(2, 0, {
-      name: user.username,
-      clan: user.is_admin ? "OPS" : "ALLY",
-      rank: user.is_admin ? "gm" : "diamond",
-      signal: 4
-    });
-    return copy.slice(0, 10);
-  }, [user]);
-
-  const computedLog = useMemo(() => {
-    if (logLines && logLines.length > 0) {
-      return logLines;
-    }
-    return [
-      "이 서버는 Kor-Net에서 호스팅합니다.",
-      `현재: ${stats.usersOnline.toLocaleString()} 사용자가 ${stats.activeGames}게임을 플레이하고 있습니다.`,
-      "기본 채널에서 도배 방지를 위해 일부 채팅 기능이 제한됩니다.",
-      `Joining channel: ${pageTitle}`,
-      description ? description : "사령부 데이터 동기화 중...",
-      user ? `<${user.username}> 접속 승인됨.` : "게스트 모드로 접속되었습니다.",
-      "미소랜드 길드모집합니다 Ch : Op Ms-"
-    ];
-  }, [description, logLines, pageTitle, stats, user]);
+  }, [roster]);
 
   const handleQuit = () => {
     if (user) {
@@ -118,17 +96,24 @@ export default function BattleNetShell({ children, pageTitle = "Sunken Warriors"
     }
   };
 
+  const handleChatSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!chatInput.trim()) return;
+    sendMessage(chatInput);
+    setChatInput("");
+  };
+
   return (
     <div className="bnet-shell">
       <div className="bnet-frame">
         <header className="bnet-header">
           <div>
-            <p className="bnet-logo">STARCRAFT</p>
-            <p className="bnet-subtitle">BROOD WAR COMMAND CONSOLE</p>
+            <p className="bnet-logo">MATHGAME</p>
+            <p className="bnet-subtitle">REALTIME NETWORK COMMAND</p>
           </div>
           <div className="bnet-banner">
-            <p>월드 오브 워크래프트 - 불타는 성전</p>
-            <span>지금 사전등록</span>
+            <p>MathGame 시즌 이벤트</p>
+            <span>랭크전 OPEN</span>
           </div>
         </header>
         <div className="bnet-body">
@@ -153,38 +138,56 @@ export default function BattleNetShell({ children, pageTitle = "Sunken Warriors"
               <div className="bnet-console__header">
                 <div>
                   <p className="bnet-console__title">{pageTitle}</p>
-                  <p className="bnet-console__desc">
-                    {description ?? "사령부 연결 상태 양호 · LATENCY GREEN"}
-                  </p>
+                  <p className="bnet-console__desc">{description ?? "채널 MathNet-01 연결됨 · 전체 채팅 활성화"}</p>
                 </div>
-                <div className="bnet-console__chip">
-                  {user ? `ID ${user.username}` : "Guest Access"}
+                <div className={clsx("bnet-console__chip", connected ? "chip-online" : "chip-offline")}>
+                  {connected ? "CHANNEL ONLINE" : "CONNECTING"}
                 </div>
               </div>
-              <div className="bnet-console__log">
-                {computedLog.map((line, index) => (
-                  <p key={`${line}-${index}`} className="crt-text">
-                    {line}
-                  </p>
-                ))}
-                <p className="bnet-console__timestamp">Last check · {stats.lastCheck}</p>
+              <div className="bnet-chat">
+                <div className="bnet-chat__log" ref={chatScrollRef}>
+                  {messages.length === 0 ? (
+                    <p className="bnet-chat__placeholder">아직 메시지가 없습니다. 첫 채팅을 입력해 보세요.</p>
+                  ) : (
+                    messages.map((entry) => (
+                      <div key={entry.id} className="bnet-chat__line">
+                        <span className="bnet-chat__time">{formatTime(entry.timestamp)}</span>
+                        <span className="bnet-chat__author">{entry.user}</span>
+                        <span className="bnet-chat__message">{entry.message}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <form className="bnet-chat__form" onSubmit={handleChatSubmit}>
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(event) => setChatInput(event.target.value)}
+                    placeholder={connected ? "채널에 메시지 보내기" : "연결 중..."}
+                    disabled={!connected}
+                  />
+                  <button type="submit" disabled={!connected || !chatInput.trim()}>
+                    Send
+                  </button>
+                </form>
               </div>
             </section>
             <section className="bnet-content">{children}</section>
           </main>
           <aside className="bnet-roster">
             <div className="bnet-roster__title">
-              Brood War Ladder <span>(89)</span>
+              MathGame Ladder <span>({decoratedRoster.length || 0})</span>
             </div>
             <ul className="bnet-roster__list">
-              {roster.map((player) => (
-                <li key={`${player.name}-${player.clan}`} className="bnet-roster__item">
+              {decoratedRoster.length === 0 && <li className="bnet-roster__empty">접속 중인 사령관이 없습니다.</li>}
+              {decoratedRoster.map((player) => (
+                <li key={player.user_id} className="bnet-roster__item">
                   <div>
-                    <p className="bnet-roster__name">{player.name}</p>
-                    <p className="bnet-roster__clan">{player.clan}</p>
+                    <p className="bnet-roster__name">{player.username}</p>
+                    <p className="bnet-roster__clan">{player.user_id.slice(0, 8)}</p>
                   </div>
                   <div className="bnet-roster__meta">
-                    <span className={clsx("bnet-roster__badge", `badge-${player.rank}`)} />
+                    <span className={clsx("bnet-roster__badge", `badge-${player.badge}`)} />
                     <div className="bnet-roster__signal">
                       {Array.from({ length: 4 }).map((_, index) => (
                         <span key={index} className={clsx("bar", index < player.signal && "active")} />
@@ -199,7 +202,7 @@ export default function BattleNetShell({ children, pageTitle = "Sunken Warriors"
             </button>
           </aside>
         </div>
-        <footer className="bnet-footer">© 2000-2025 Kor-Net Command Center · Build stable/14.2.14</footer>
+        <footer className="bnet-footer">© 2025 MathGame Command · Build stable/14.2.14</footer>
       </div>
     </div>
   );

@@ -1,13 +1,16 @@
-import TopNav from "@/components/TopNav";
 import AuthForm from "@/components/forms/AuthForm";
 
 export default function LoginPage() {
   return (
-    <TopNav pageTitle="Battle.net Access" description="지휘관 인증 포털 · ACCESS LEVEL 3">
-      <main className="mx-auto flex max-w-3xl justify-center py-10">
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md space-y-4">
+        <div className="text-center">
+          <p className="text-[10px] uppercase tracking-[0.5em] text-night-400">MATHGAME NETWORK</p>
+          <p className="text-sm text-night-300">접속하려면 계정으로 로그인하세요.</p>
+        </div>
         <AuthForm mode="login" />
-      </main>
-    </TopNav>
+      </div>
+    </div>
   );
 }
 

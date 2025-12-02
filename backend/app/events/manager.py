@@ -8,6 +8,7 @@ class ConnectionManager:
     def __init__(self) -> None:
         self.room_connections: Dict[str, Set[WebSocket]] = defaultdict(set)
         self.dashboard_connections: Set[WebSocket] = set()
+        self.lobby_connections: Dict[WebSocket, dict[str, str]] = {}
 
     async def connect_room(self, room_id: str, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -36,9 +37,31 @@ class ConnectionManager:
         for connection in connections:
             await connection.send_json(payload)
 
+    async def connect_lobby(self, websocket: WebSocket, user_info: dict[str, str]) -> None:
+        await websocket.accept()
+        self.lobby_connections[websocket] = {
+            "user_id": user_info.get("user_id", ""),
+            "username": user_info.get("username", "Guest"),
+        }
+
+    def disconnect_lobby(self, websocket: WebSocket) -> None:
+        self.lobby_connections.pop(websocket, None)
+
+    async def broadcast_lobby(self, payload: dict) -> None:
+        connections = list(self.lobby_connections.keys())
+        for connection in connections:
+            await connection.send_json(payload)
+
     @property
     def online_player_count(self) -> int:
         return sum(len(conns) for conns in self.room_connections.values())
+
+    @property
+    def lobby_roster(self) -> list[dict[str, str]]:
+        return [
+            {"user_id": data.get("user_id", ""), "username": data.get("username", "Guest")}
+            for data in self.lobby_connections.values()
+        ]
 
 
 manager = ConnectionManager()
