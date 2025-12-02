@@ -22,15 +22,14 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
 
   if (!bundle) {
     return (
-      <div>
-        <TopNav />
-        <main className="mx-auto max-w-4xl px-6 py-10 text-center text-white">
+      <TopNav pageTitle="League Feed" description="토너먼트를 찾을 수 없습니다.">
+        <main className="mx-auto max-w-4xl py-10 text-center text-white">
           <p>토너먼트를 찾을 수 없습니다.</p>
-          <Link href="/tournaments" className="text-indigo-400 underline">
+          <Link href="/tournaments" className="text-indigo-300 underline">
             목록으로 돌아가기
           </Link>
         </main>
-      </div>
+      </TopNav>
     );
   }
 
@@ -49,9 +48,11 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
   }));
 
   return (
-    <div>
-      <TopNav />
-      <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+    <TopNav
+      pageTitle={`League · ${bundle.tournament.name}`}
+      description={`상태 ${bundle.tournament.status} · 슬롯 ${bundle.slots.length}`}
+    >
+      <main className="mx-auto max-w-5xl space-y-6 py-6">
         <div className="card space-y-4">
           <div>
             <h1 className="text-2xl font-semibold text-white">{bundle.tournament.name}</h1>
@@ -61,7 +62,7 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
         </div>
         <Bracket matches={bracketMatches} />
       </main>
-    </div>
+    </TopNav>
   );
 }
 

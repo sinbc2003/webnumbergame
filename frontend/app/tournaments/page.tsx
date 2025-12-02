@@ -21,9 +21,8 @@ export default async function TournamentPage() {
   const tournaments = await fetchTournaments();
 
   return (
-    <div>
-      <TopNav />
-      <main className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+    <TopNav pageTitle="League Center" description="토너먼트 편성/관전 · LADDER NET">
+      <main className="mx-auto max-w-5xl space-y-6 py-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-white">토너먼트</h1>
           <Link
@@ -51,7 +50,7 @@ export default async function TournamentPage() {
           )}
         </div>
       </main>
-    </div>
+    </TopNav>
   );
 }
 

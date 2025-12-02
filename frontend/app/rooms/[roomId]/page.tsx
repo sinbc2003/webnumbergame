@@ -33,22 +33,25 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
 
   if (!room) {
     return (
-      <div className="mx-auto max-w-xl text-center text-white">
-        <TopNav />
-        <main className="px-6 py-10">
+      <TopNav pageTitle="Channel Offline" description="선택한 방을 찾을 수 없습니다.">
+        <main className="mx-auto max-w-xl py-10 text-center text-white">
           <p>방을 찾을 수 없습니다.</p>
-          <Link href="/rooms" className="text-indigo-400 underline">
+          <Link href="/rooms" className="text-indigo-300 underline">
             방 목록으로 돌아가기
           </Link>
         </main>
-      </div>
+      </TopNav>
     );
   }
 
+  const roundLabel = room.round_type === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
+
   return (
-    <div className="min-h-screen">
-      <TopNav />
-      <main className="mx-auto max-w-6xl px-6 py-8">
+    <TopNav
+      pageTitle={`Room · ${room.name}`}
+      description={`방 코드 ${room.code} · ${roundLabel} · 현재 ${participants.length}명`}
+    >
+      <main className="mx-auto max-w-6xl py-6">
         <div className="grid gap-6 lg:grid-cols-[2.2fr,1fr]">
           <section>
             <RoomGamePanel room={room} participants={participants} />
@@ -58,7 +61,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
           </section>
         </div>
       </main>
-    </div>
+    </TopNav>
   );
 }
 

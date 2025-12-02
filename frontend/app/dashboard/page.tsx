@@ -34,9 +34,8 @@ export default async function DashboardPage() {
 
   return (
     <RequireAuth>
-      <div>
-        <TopNav />
-        <main className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+      <TopNav pageTitle="Command Channel : Dashboard" description="실시간 지휘 정보 · OPERATIONS ONLINE">
+        <main className="mx-auto max-w-6xl space-y-6 py-4">
           <section>
             <SummaryGrid summary={summary} />
           </section>
@@ -45,13 +44,13 @@ export default async function DashboardPage() {
             <div className="card">
               <p className="text-sm font-semibold text-night-200">실시간 공지</p>
               <p className="mt-3 text-sm text-night-300">
-                1라운드 개인전은 3분 동안 최적해를 찾으면 즉시 승리합니다. 2라운드 팀전에서는 팀 배분과 작전 타임을 활용해 가장
-                효율적인 수식을 만들어 보세요.
+                1라운드 개인전은 3분 동안 최적해를 찾으면 즉시 승리합니다. 2라운드 팀전에서는 배분과 작전 타임을 조율해 최적해를
+                완성하세요.
               </p>
             </div>
           </section>
         </main>
-      </div>
+      </TopNav>
     </RequireAuth>
   );
 }

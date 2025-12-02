@@ -3,12 +3,11 @@ import AuthForm from "@/components/forms/AuthForm";
 
 export default function RegisterPage() {
   return (
-    <div>
-      <TopNav />
-      <main className="mx-auto flex max-w-6xl justify-center px-6 py-16">
+    <TopNav pageTitle="Commander Registration" description="신규 사령관 계정 발급 · LEVEL 1 CLEARANCE">
+      <main className="mx-auto flex max-w-3xl justify-center py-10">
         <AuthForm mode="register" />
       </main>
-    </div>
+    </TopNav>
   );
 }
 

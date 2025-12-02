@@ -5,9 +5,8 @@ export const revalidate = 0;
 
 export default function AdminPage() {
   return (
-    <div>
-      <TopNav />
-      <main className="mx-auto max-w-5xl px-6 py-8">
+    <TopNav pageTitle="Ops Console" description="관리자 전용 패널 · LEVEL 7 CLEARANCE">
+      <main className="mx-auto max-w-5xl py-6">
         <h1 className="text-2xl font-semibold text-white">관리자 페이지</h1>
         <p className="mt-2 text-sm text-night-400">
           문제 데이터 관리 및 테스트 데이터 초기화를 수행할 수 있습니다.
@@ -16,7 +15,7 @@ export default function AdminPage() {
           <AdminPanel />
         </div>
       </main>
-    </div>
+    </TopNav>
   );
 }
 

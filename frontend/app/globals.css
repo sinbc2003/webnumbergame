@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,18 +9,374 @@
 }
 
 body {
-  @apply text-slate-100 min-h-screen;
-  font-family: "Pretendard Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background-color: #03060f;
+  @apply min-h-screen text-[#e2f1ff];
+  font-family: "Rajdhani", "Pretendard Variable", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #03060c;
   background-image:
-    radial-gradient(circle at 20% 20%, rgba(54, 95, 168, 0.35), transparent 55%),
-    radial-gradient(circle at 80% 0%, rgba(36, 109, 160, 0.32), transparent 45%),
-    radial-gradient(circle at 50% 100%, rgba(103, 81, 181, 0.25), transparent 50%),
-    linear-gradient(120deg, #03060f 0%, #050b19 45%, #070c1d 100%);
+    radial-gradient(circle at 15% 15%, rgba(90, 132, 255, 0.15), transparent 45%),
+    radial-gradient(circle at 80% 0%, rgba(32, 83, 136, 0.25), transparent 45%),
+    linear-gradient(120deg, rgba(6, 10, 20, 0.95), rgba(2, 5, 12, 0.95)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.02),
+      rgba(255, 255, 255, 0.02) 1px,
+      transparent 1px,
+      transparent 3px
+    );
   background-attachment: fixed;
+  letter-spacing: 0.03em;
+}
+
+.bnet-shell {
+  min-height: 100vh;
+  padding: 2.5rem 1rem;
+}
+
+@media (max-width: 768px) {
+  .bnet-shell {
+    padding: 1.5rem 0.75rem;
+  }
+}
+
+.bnet-frame {
+  margin: 0 auto;
+  max-width: 1200px;
+  border: 4px solid #3d2a12;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(5, 8, 15, 0.96), rgba(3, 5, 12, 0.98));
+  box-shadow:
+    0 25px 60px rgba(0, 0, 0, 0.85),
+    inset 0 0 80px rgba(6, 12, 26, 0.8);
+  overflow: hidden;
+}
+
+.bnet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid rgba(61, 36, 15, 0.8);
+  background: linear-gradient(120deg, #172242 0%, #0b101f 80%);
+}
+
+.bnet-logo {
+  font-family: "Orbitron", "Rajdhani", sans-serif;
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  letter-spacing: 0.35em;
+  color: #c7edff;
+  margin: 0;
+  text-shadow:
+    0 0 18px rgba(140, 228, 255, 0.6),
+    0 0 4px rgba(255, 255, 255, 0.7);
+}
+
+.bnet-subtitle {
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.55em;
+  color: #f7c979;
+}
+
+.bnet-banner {
+  border: 1px solid rgba(255, 214, 141, 0.6);
+  background: linear-gradient(135deg, rgba(55, 82, 23, 0.9), rgba(106, 155, 33, 0.85));
+  padding: 0.85rem 1.1rem;
+  border-radius: 1rem;
+  text-align: right;
+  color: #ffe6b5;
+  font-size: 0.85rem;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+}
+
+.bnet-banner span {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.4em;
+  color: #fffbda;
+}
+
+.bnet-body {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.5rem 2rem 2rem;
+  background: linear-gradient(180deg, rgba(12, 16, 26, 0.95), rgba(4, 6, 12, 0.95));
+}
+
+@media (max-width: 1024px) {
+  .bnet-body {
+    flex-direction: column;
+  }
+}
+
+.bnet-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 190px;
+}
+
+@media (max-width: 1024px) {
+  .bnet-menu {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+}
+
+.bnet-button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(180deg, #4f3622 0%, #22140b 90%);
+  color: #ffe6bf;
+  border: 2px solid #7d5930;
+  border-radius: 0.85rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 8px 18px rgba(0, 0, 0, 0.65);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bnet-button:hover {
+  transform: translateY(-2px);
+  border-color: #f5c26b;
+}
+
+.bnet-button--active {
+  border-color: #f5c26b;
+  box-shadow:
+    inset 0 0 12px rgba(245, 194, 107, 0.4),
+    0 10px 20px rgba(0, 0, 0, 0.75);
+}
+
+.bnet-button--alert {
+  background: linear-gradient(180deg, #6d1f1f 0%, #230707 90%);
+  color: #ffe3d4;
+}
+
+.bnet-button__hint {
+  font-size: 0.6rem;
+  letter-spacing: 0.5em;
+  color: #ffd590;
+}
+
+.bnet-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.bnet-console {
+  border: 1px solid rgba(52, 88, 140, 0.7);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  background: linear-gradient(160deg, rgba(9, 18, 36, 0.95), rgba(3, 6, 14, 0.95));
+  box-shadow: inset 0 0 25px rgba(4, 11, 24, 0.8);
+}
+
+.bnet-console__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.bnet-console__title {
+  font-size: 1.1rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #a6d8ff;
+  margin-bottom: 0.35rem;
+}
+
+.bnet-console__desc {
+  font-size: 0.85rem;
+  color: #85a6d4;
+}
+
+.bnet-console__chip {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(144, 230, 255, 0.6);
+  border-radius: 999px;
+  letter-spacing: 0.25em;
+  font-size: 0.72rem;
+  color: #9eefff;
+  background: rgba(25, 58, 92, 0.4);
+}
+
+.bnet-console__log {
+  margin-top: 1.25rem;
+  font-family: "Roboto Mono", "Consolas", monospace;
+  font-size: 0.85rem;
+  color: #8df8aa;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.crt-text {
+  text-shadow:
+    0 0 6px rgba(0, 255, 140, 0.35),
+    0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+.bnet-console__timestamp {
+  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  color: #7da1d4;
+}
+
+.bnet-content {
+  border: 1px solid rgba(37, 73, 116, 0.6);
+  border-radius: 1.2rem;
+  background: linear-gradient(180deg, rgba(5, 10, 18, 0.95), rgba(3, 5, 11, 0.98));
+  padding: 1.75rem;
+  box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.55);
+  min-height: 320px;
+}
+
+.bnet-roster {
+  width: 250px;
+  border: 1px solid rgba(71, 53, 28, 0.8);
+  border-radius: 1.2rem;
+  padding: 1.25rem;
+  background: linear-gradient(180deg, #1a130c 0%, #070503 100%);
+  box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 1024px) {
+  .bnet-roster {
+    width: 100%;
+  }
+}
+
+.bnet-roster__title {
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+  color: #f7cd92;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(251, 214, 167, 0.25);
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+
+.bnet-roster__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.bnet-roster__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #f5ddc2;
+  font-size: 0.82rem;
+}
+
+.bnet-roster__name {
+  font-weight: 600;
+}
+
+.bnet-roster__clan {
+  font-size: 0.7rem;
+  color: #d1b994;
+}
+
+.bnet-roster__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.bnet-roster__badge {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #3c7bd6, #10264d);
+  box-shadow: inset 0 0 6px rgba(255, 255, 255, 0.25);
+}
+
+.badge-gm {
+  background: linear-gradient(135deg, #ffd37b, #d1892a);
+}
+
+.badge-diamond {
+  background: linear-gradient(135deg, #7ed6ff, #175b91);
+}
+
+.badge-platinum {
+  background: linear-gradient(135deg, #9ee2f2, #2d7c9b);
+}
+
+.badge-gold {
+  background: linear-gradient(135deg, #f9d27a, #c88624);
+}
+
+.badge-silver {
+  background: linear-gradient(135deg, #d6e6f5, #6f7f8a);
+}
+
+.badge-bronze {
+  background: linear-gradient(135deg, #d7a679, #6a4129);
+}
+
+.bnet-roster__signal {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.bnet-roster__signal .bar {
+  width: 4px;
+  height: 10px;
+  background: rgba(124, 147, 149, 0.4);
+  border-radius: 1px;
+}
+
+.bnet-roster__signal .bar.active {
+  background: #7ef4a0;
+  box-shadow: 0 0 6px rgba(120, 255, 178, 0.6);
+}
+
+.bnet-roster__cta {
+  margin-top: 1.2rem;
+  width: 100%;
+  border: 1px solid rgba(123, 170, 255, 0.5);
+  border-radius: 0.75rem;
+  padding: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  font-size: 0.75rem;
+  color: #aee6ff;
+  background: rgba(17, 36, 61, 0.8);
+  box-shadow: inset 0 0 12px rgba(55, 136, 214, 0.4);
+}
+
+.bnet-footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  color: #7f8fb0;
+  border-top: 1px solid rgba(44, 64, 97, 0.5);
+  background: #05070e;
 }
 
 .card {
-  @apply bg-night-900/70 border border-night-700/60 rounded-xl p-6 shadow-lg shadow-black/30;
+  border: 1px solid rgba(91, 63, 28, 0.8);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  background: linear-gradient(150deg, rgba(18, 14, 9, 0.95), rgba(7, 5, 3, 0.95));
+  box-shadow:
+    inset 0 0 25px rgba(0, 0, 0, 0.65),
+    0 15px 40px rgba(0, 0, 0, 0.4);
 }
 
