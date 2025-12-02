@@ -91,15 +91,18 @@ async def reset_arena(session: AsyncSession = Depends(get_session)) -> ResetSumm
     room_ids_result = await session.execute(select(Room.id))
     room_ids = [row[0] for row in room_ids_result.fetchall()]
 
+    # 삭제 순서는 외래키 제약 조건을 위배하지 않도록
+    # Room 을 참조하는 엔터티들을 먼저 정리한 뒤,
+    # Tournament 등 상위 개체를 삭제하는 순서로 정렬한다.
     model_sequence = [
         (Submission, "submissions"),
         (RoundSnapshot, "round_snapshots"),
         (Match, "matches"),
         (RoomParticipant, "room_participants"),
-        (Room, "rooms"),
         (TeamMember, "team_members"),
         (Team, "teams"),
         (TournamentMatch, "tournament_matches"),
+        (Room, "rooms"),
         (TournamentSlot, "tournament_slots"),
         (Tournament, "tournaments"),
     ]
