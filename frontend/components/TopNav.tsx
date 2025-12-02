@@ -27,11 +27,14 @@ const NAV_BUTTONS: NavButton[] = [
 const ADMIN_BUTTON: NavButton = { id: "ops", label: "관리", hint: "ADMIN", href: "/admin" };
 const BADGE_SEQUENCE = ["gm", "diamond", "platinum", "gold", "silver", "bronze"];
 
+type LayoutMode = "lobby" | "focus";
+
 interface Props {
   children?: ReactNode;
   pageTitle?: string;
   description?: string;
   showChat?: boolean;
+  layout?: LayoutMode;
 }
 
 const formatTime = (value: string) => {
@@ -47,6 +50,7 @@ export default function MathNetworkShell({
   pageTitle = "MathGame Command",
   description,
   showChat = true,
+  layout = "lobby",
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -59,6 +63,7 @@ export default function MathNetworkShell({
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showContent = Boolean(children);
   const shouldShowConsole = showChat || !showContent;
+  const isFocus = layout === "focus";
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -113,11 +118,11 @@ export default function MathNetworkShell({
     clearTimers();
     transitionTimerRef.current = setTimeout(() => {
       callback();
-    }, 320);
+    }, 1000);
     resetTimerRef.current = setTimeout(() => {
       setTransitioning(false);
       clearTimers();
-    }, 900);
+    }, 1700);
   };
 
   const handleNavigate = (button: NavButton) => {
@@ -146,6 +151,30 @@ export default function MathNetworkShell({
   };
 
   const chatDisabled = !connected || transitioning;
+
+  if (isFocus) {
+    return (
+      <ShellTransitionProvider value={runTransition}>
+        <div className={clsx("focus-shell", transitioning && "focus-shell--exit")}>
+          <header className="focus-shell__header">
+            <div>
+              <p className="focus-shell__title">{pageTitle}</p>
+              {description && <p className="focus-shell__desc">{description}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => runTransition(() => router.push("/dashboard"))}
+              className="focus-shell__home"
+              disabled={transitioning}
+            >
+              홈으로
+            </button>
+          </header>
+          <main className="focus-shell__content">{children}</main>
+        </div>
+      </ShellTransitionProvider>
+    );
+  }
 
   return (
     <div className={clsx("bnet-shell", transitioning && "bnet-shell--exit")}>

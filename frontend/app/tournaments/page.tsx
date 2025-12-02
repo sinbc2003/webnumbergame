@@ -21,7 +21,12 @@ export default async function TournamentPage() {
   const tournaments = await fetchTournaments();
 
   return (
-    <TopNav pageTitle="League Center" description="토너먼트 편성/관전 · LADDER NET" showChat={false}>
+    <TopNav
+      layout="focus"
+      pageTitle="League Center"
+      description="토너먼트 편성/관전 · LADDER NET"
+      showChat={false}
+    >
       <main className="mx-auto max-w-5xl space-y-6 py-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-white">토너먼트</h1>

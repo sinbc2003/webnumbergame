@@ -22,7 +22,7 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
 
   if (!bundle) {
     return (
-      <TopNav pageTitle="League Feed" description="토너먼트를 찾을 수 없습니다." showChat={false}>
+      <TopNav layout="focus" pageTitle="League Feed" description="토너먼트를 찾을 수 없습니다." showChat={false}>
         <main className="mx-auto max-w-4xl py-10 text-center text-white">
           <p>토너먼트를 찾을 수 없습니다.</p>
           <Link href="/tournaments" className="text-indigo-300 underline">
@@ -49,6 +49,7 @@ export default async function TournamentDetailPage({ params }: { params: { id: s
 
   return (
     <TopNav
+      layout="focus"
       pageTitle={`League · ${bundle.tournament.name}`}
       description={`상태 ${bundle.tournament.status} · 슬롯 ${bundle.slots.length}`}
       showChat={false}

@@ -20,7 +20,7 @@ export const revalidate = 0;
 export default async function RoomsPage() {
   const rooms = await fetchRooms();
   return (
-    <TopNav pageTitle="Channel Lobby : Rooms" description="실시간 방 편성 · MATCH QUEUE READY" showChat={false}>
+    <TopNav layout="focus" pageTitle="Channel Lobby : Rooms" description="실시간 방 편성 · MATCH QUEUE READY" showChat={false}>
       <main className="mx-auto grid max-w-6xl gap-6 py-4 lg:grid-cols-[1fr_320px]">
         <section>
           <RoomList rooms={rooms} />

@@ -7,7 +7,7 @@ export const revalidate = 0;
 export default function AdminPage() {
   return (
     <RequireAuth>
-      <TopNav pageTitle="Ops Console" description="관리자 전용 패널 · LEVEL 7 CLEARANCE" showChat={false}>
+      <TopNav layout="focus" pageTitle="Ops Console" description="관리자 전용 패널 · LEVEL 7 CLEARANCE" showChat={false}>
         <main className="mx-auto max-w-5xl py-6">
           <h1 className="text-2xl font-semibold text-white">관리자 페이지</h1>
           <p className="mt-2 text-sm text-night-400">
