@@ -71,11 +71,11 @@ async def leave_room(
     if room.host_id == current_user.id:
         await session.delete(room)
         await session.commit()
-        if not forfeited:
-            await manager.broadcast_room(
-                room.id,
-                {"type": "room_closed", "room_id": room.id},
-            )
+        reason = "host_left_forfeit" if forfeited else "host_left"
+        await manager.broadcast_room(
+            room.id,
+            {"type": "room_closed", "room_id": room.id, "reason": reason},
+        )
         return
 
     session.add(room)
@@ -122,6 +122,10 @@ async def _ensure_host_active(session: AsyncSession, room: Room) -> None:
 
     await session.delete(room)
     await session.commit()
+    await manager.broadcast_room(
+        room.id,
+        {"type": "room_closed", "room_id": room.id, "reason": "host_disconnected"},
+    )
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="방이 종료되었습니다.")
 
 

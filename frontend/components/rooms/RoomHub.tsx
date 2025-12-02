@@ -20,14 +20,21 @@ const fetchParticipants = async (roomId: string) => {
 };
 
 interface RoomHubProps {
-  rooms: Room[];
+  initialRooms: Room[];
   view: "join" | "create";
   showTabs?: boolean;
 }
 
-export default function RoomHub({ rooms, view, showTabs = false }: RoomHubProps) {
+const fetchRooms = async () => {
+  const { data } = await api.get<Room[]>("/rooms");
+  return data;
+};
+
+export default function RoomHub({ initialRooms, view, showTabs = false }: RoomHubProps) {
   const [currentView, setCurrentView] = useState<"join" | "create">(view);
   const activeView = showTabs ? currentView : view;
+  const { data: liveRooms } = useSWR("/rooms", fetchRooms, { fallbackData: initialRooms, refreshInterval: 5000 });
+  const rooms = liveRooms ?? [];
   return (
     <div className="room-hub">
       {showTabs && (

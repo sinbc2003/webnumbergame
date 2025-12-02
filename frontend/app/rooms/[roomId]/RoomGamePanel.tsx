@@ -610,6 +610,8 @@ export default function RoomGamePanel({ room, participants }: Props) {
             if (closingReason === "forfeit") {
               setStatusMessage("상대가 방을 떠나 경기가 종료되었습니다.");
               setStatusError(null);
+        } else if (closingReason === "host_left" || closingReason === "host_left_forfeit" || closingReason === "host_disconnected") {
+          setStatusError("방장이 퇴장했습니다.");
             } else {
               setStatusError("방장이 방을 종료했습니다.");
             }
