@@ -3,7 +3,7 @@ import secrets
 from functools import lru_cache
 from typing import List
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_CORS_ORIGINS = ["http://localhost:3000"]
@@ -55,6 +55,24 @@ class Settings(BaseSettings):
     max_room_capacity: int = 16
     db_init_max_retries: int = 5
     db_init_retry_interval_seconds: float = 2.0
+
+    @field_validator("database_url")
+    @classmethod
+    def ensure_async_driver(cls, value: str) -> str:
+        """
+        Cloud Run / GitHub Actions 환경 변수에서 흔히 사용하는
+        postgresql:// 혹은 postgres:// 형태를 자동으로 asyncpg 드라이버로 보정한다.
+        """
+        if not value:
+            return value
+
+        if value.startswith("postgres://"):
+            return "postgresql+asyncpg://" + value[len("postgres://") :]
+
+        if value.startswith("postgresql://") and "+asyncpg" not in value.split("://", 1)[0]:
+            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+        return value
 
     @property
     def cors_origins(self) -> List[str]:
