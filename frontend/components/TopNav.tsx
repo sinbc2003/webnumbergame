@@ -27,7 +27,7 @@ const ADMIN_BUTTON: NavButton = { id: "ops", label: "관리", hint: "ADMIN", hre
 const BADGE_SEQUENCE = ["gm", "diamond", "platinum", "gold", "silver", "bronze"];
 
 interface Props {
-  children: ReactNode;
+  children?: ReactNode;
   pageTitle?: string;
   description?: string;
 }
@@ -47,6 +47,9 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
   const { messages, roster, connected, sendMessage } = useLobby();
   const [chatInput, setChatInput] = useState("");
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const [transitioning, setTransitioning] = useState(false);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showContent = Boolean(children);
 
   useEffect(() => {
@@ -79,20 +82,51 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
     });
   }, [roster]);
 
-  const handleQuit = () => {
-    if (user) {
-      logout();
+  const clearTimers = () => {
+    if (transitionTimerRef.current) {
+      clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = null;
     }
-    router.push("/login");
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearTimers();
+    };
+  }, []);
+
+  const runTransition = (callback: () => void) => {
+    if (transitioning) return;
+    setTransitioning(true);
+    clearTimers();
+    transitionTimerRef.current = setTimeout(() => {
+      callback();
+    }, 320);
+    resetTimerRef.current = setTimeout(() => {
+      setTransitioning(false);
+      clearTimers();
+    }, 900);
   };
 
   const handleNavigate = (button: NavButton) => {
     if (button.action === "quit") {
-      handleQuit();
+      runTransition(() => {
+        if (user) {
+          logout();
+        }
+        router.push("/login");
+      });
       return;
     }
     if (button.href) {
-      router.push(button.href);
+      if (pathname === button.href) {
+        return;
+      }
+      runTransition(() => router.push(button.href as string));
     }
   };
 
@@ -103,8 +137,10 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
     setChatInput("");
   };
 
+  const chatDisabled = !connected || transitioning;
+
   return (
-    <div className="bnet-shell">
+    <div className={clsx("bnet-shell", transitioning && "bnet-shell--exit")}>
       <div className="bnet-frame">
         <header className="bnet-header">
           <div>
@@ -126,6 +162,7 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
                   type="button"
                   onClick={() => handleNavigate(button)}
                   className={clsx("bnet-button", isActive && "bnet-button--active", button.action === "quit" && "bnet-button--alert")}
+                  disabled={transitioning}
                 >
                   <span>{button.label}</span>
                   <span className="bnet-button__hint">{button.hint}</span>
@@ -164,9 +201,9 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
                     value={chatInput}
                     onChange={(event) => setChatInput(event.target.value)}
                     placeholder={connected ? "채널에 메시지 보내기" : "연결 중..."}
-                    disabled={!connected}
+                    disabled={chatDisabled}
                   />
-                  <button type="submit" disabled={!connected || !chatInput.trim()}>
+                  <button type="submit" disabled={chatDisabled || !chatInput.trim()}>
                     Send
                   </button>
                 </form>

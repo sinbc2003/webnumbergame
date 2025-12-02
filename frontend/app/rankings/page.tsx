@@ -1,4 +1,5 @@
 import RequireAuth from "@/components/RequireAuth";
+import TopNav from "@/components/TopNav";
 import LeaderboardCard from "@/components/dashboard/LeaderboardCard";
 import type { LeaderboardEntry } from "@/types/api";
 
@@ -21,11 +22,13 @@ export default async function RankingsPage() {
   const leaderboard = await fetchLeaderboard();
   return (
     <RequireAuth>
-      <div className="mx-auto max-w-5xl px-6 py-8 space-y-4">
-        <h1 className="text-3xl font-semibold text-white">랭킹</h1>
-        <p className="text-sm text-night-400">실시간 퍼포먼스 점수를 기준으로 정렬된 상위 플레이어 목록입니다.</p>
-        <LeaderboardCard entries={leaderboard} />
-      </div>
+      <TopNav pageTitle="랭킹 패널" description="MathGame 최상위 지휘관 현황">
+        <main className="mx-auto max-w-5xl px-6 py-8 space-y-4">
+          <h1 className="text-3xl font-semibold text-white">랭킹</h1>
+          <p className="text-sm text-night-400">실시간 퍼포먼스 점수를 기준으로 정렬된 상위 플레이어 목록입니다.</p>
+          <LeaderboardCard entries={leaderboard} />
+        </main>
+      </TopNav>
     </RequireAuth>
   );
 }
