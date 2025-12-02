@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from ..database import get_session
+from ..enums import MatchStatus, RoomStatus
 from ..events.manager import manager
 from ..models import Match, Room, User
 from ..schemas.dashboard import DashboardSummary, LeaderboardEntry, LeaderboardResponse
@@ -16,8 +17,12 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 @router.get("/summary", response_model=DashboardSummary)
 async def read_summary(session: AsyncSession = Depends(get_session)):
     total_users = (await session.execute(select(func.count(User.id)))).scalar() or 0  # type: ignore
-    active_rooms = (await session.execute(select(func.count(Room.id)))).scalar() or 0  # type: ignore
-    ongoing_matches = (await session.execute(select(func.count(Match.id)))).scalar() or 0  # type: ignore
+
+    active_rooms_stmt = select(func.count(Room.id)).where(Room.status != RoomStatus.ARCHIVED)
+    active_rooms = (await session.execute(active_rooms_stmt)).scalar() or 0  # type: ignore
+
+    ongoing_matches_stmt = select(func.count(Match.id)).where(Match.status == MatchStatus.ACTIVE)
+    ongoing_matches = (await session.execute(ongoing_matches_stmt)).scalar() or 0  # type: ignore
 
     return DashboardSummary(
         total_users=total_users,
