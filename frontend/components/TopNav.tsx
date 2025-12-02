@@ -19,8 +19,8 @@ type NavButton = {
 };
 
 const NAV_BUTTONS: NavButton[] = [
-  { id: "solo", label: "개인전", hint: "ROUND1", href: "/rooms" },
-  { id: "tournament", label: "토너먼트 전", hint: "ROUND2", href: "/tournaments" },
+  { id: "create-room", label: "방 만들기", hint: "NEW", href: "/rooms/create" },
+  { id: "join-game", label: "게임 참여", hint: "JOIN", href: "/rooms" },
   { id: "ranking", label: "랭킹", hint: "RANK", href: "/rankings" },
   { id: "logout", label: "로그아웃", hint: "EXIT", action: "quit" },
 ];

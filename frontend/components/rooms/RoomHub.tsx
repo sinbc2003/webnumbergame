@@ -19,30 +19,44 @@ const fetchParticipants = async (roomId: string) => {
   return data;
 };
 
-export default function RoomHub({ rooms }: { rooms: Room[] }) {
-  const [view, setView] = useState<"join" | "create">("join");
+interface RoomHubProps {
+  rooms: Room[];
+  view: "join" | "create";
+  showTabs?: boolean;
+}
+
+export default function RoomHub({ rooms, view, showTabs = false }: RoomHubProps) {
+  const [currentView, setCurrentView] = useState<"join" | "create">(view);
+  const activeView = showTabs ? currentView : view;
   return (
     <div className="room-hub">
-      <div className="room-hub__tabs">
-        <button type="button" onClick={() => setView("join")} className={clsx(view === "join" && "active")}>
-          Join
-        </button>
-        <button type="button" onClick={() => setView("create")} className={clsx(view === "create" && "active")}>
-          Create
-        </button>
-      </div>
-      {view === "join" ? <RoomJoinPanel rooms={rooms} /> : <RoomCreateBoard />}
+      {showTabs && (
+        <div className="room-hub__tabs">
+          <button type="button" onClick={() => setCurrentView("join")} className={clsx(activeView === "join" && "active")}>
+            Join
+          </button>
+          <button type="button" onClick={() => setCurrentView("create")} className={clsx(activeView === "create" && "active")}>
+            Create
+          </button>
+        </div>
+      )}
+      {activeView === "join" ? <RoomJoinPanel rooms={rooms} /> : <RoomCreateBoard />}
     </div>
   );
 }
 
 function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
   const [search, setSearch] = useState("");
+  const [modeFilter, setModeFilter] = useState<"all" | "solo" | "team">("all");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(rooms[0]?.id ?? null);
   const filtered = useMemo(() => {
-    if (!search.trim()) return rooms;
-    return rooms.filter((room) => room.name.toLowerCase().includes(search.trim().toLowerCase()));
-  }, [rooms, search]);
+    return rooms.filter((room) => {
+      const matchesSearch = room.name.toLowerCase().includes(search.trim().toLowerCase());
+      if (!matchesSearch) return false;
+      if (modeFilter === "all") return true;
+      return modeFilter === "solo" ? room.round_type === "round1_individual" : room.round_type === "round2_team";
+    });
+  }, [rooms, search, modeFilter]);
   const selectedRoom = filtered.find((room) => room.id === selectedRoomId) ?? filtered[0];
   const { data: participants } = useSWR(selectedRoom ? selectedRoom.id : null, fetchParticipants);
   const playerCount = participants?.length ?? 0;
@@ -57,9 +71,32 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
             placeholder="Search game name"
             className="room-list__search"
           />
-          <button type="button" className="room-list__filter">
-            Filter
-          </button>
+          <div className="room-list__modes">
+            <button
+              type="button"
+              onClick={() => setModeFilter("all")}
+              className={clsx(modeFilter === "all" && "active")}
+            >
+              전체
+            </button>
+            <button
+              type="button"
+              onClick={() => setModeFilter("solo")}
+              className={clsx(modeFilter === "solo" && "active")}
+            >
+              개인전
+            </button>
+            <button
+              type="button"
+              onClick={() => setModeFilter("team")}
+              className={clsx(modeFilter === "team" && "active")}
+            >
+              팀전
+            </button>
+          </div>
+          <Link href="/tournaments" className="room-list__filter">
+            토너먼트
+          </Link>
         </div>
         <div className="room-list__table">
           <div className="room-list__header">

@@ -20,7 +20,7 @@ export default async function RoomsPage() {
   const rooms = await fetchRooms();
   return (
     <TopNav layout="focus" pageTitle="Channel Lobby : Rooms" description="실시간 방 편성 · MATCH QUEUE READY" showChat={false}>
-      <RoomHub rooms={rooms} />
+      <RoomHub rooms={rooms} view="join" />
     </TopNav>
   );
 }

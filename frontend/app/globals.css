@@ -663,6 +663,27 @@ body {
   margin-bottom: 0.75rem;
 }
 
+.room-list__modes {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.room-list__modes button {
+  border-radius: 999px;
+  border: 1px solid rgba(82, 118, 166, 0.5);
+  padding: 0.35rem 0.9rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: #7e91bb;
+  background: rgba(8, 12, 24, 0.8);
+}
+
+.room-list__modes button.active {
+  border-color: rgba(145, 223, 255, 0.8);
+  color: #10182b;
+  background: linear-gradient(135deg, #7fd4ff, #1c4d7f);
+}
+
 .room-list__search {
   flex: 1;
   border-radius: 999px;
