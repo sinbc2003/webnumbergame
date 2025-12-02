@@ -118,11 +118,11 @@ export default function MathNetworkShell({
     clearTimers();
     transitionTimerRef.current = setTimeout(() => {
       callback();
-    }, 1000);
+    }, 500);
     resetTimerRef.current = setTimeout(() => {
       setTransitioning(false);
       clearTimers();
-    }, 1700);
+    }, 1100);
   };
 
   const handleNavigate = (button: NavButton) => {
