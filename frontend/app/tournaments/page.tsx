@@ -15,6 +15,8 @@ async function fetchTournaments(): Promise<Tournament[]> {
   }
 }
 
+export const revalidate = 0;
+
 export default async function TournamentPage() {
   const tournaments = await fetchTournaments();
 

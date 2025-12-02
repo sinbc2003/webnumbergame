@@ -113,14 +113,8 @@ async def reset_arena(session: AsyncSession = Depends(get_session)) -> ResetSumm
             await session.execute(sa_delete(model))
         deleted[label] = count
 
-    await session.execute(
-        sa_update(User).values(
-            rating=1200,
-            win_count=0,
-            loss_count=0,
-            total_score=0,
-        )
-    )
+    # 기존 사용자(관리자 제외) 제거 후 깨끗한 상태에서 다시 시작
+    await session.execute(sa_delete(User).where(User.is_admin.is_(False)))
 
     await session.commit()
 

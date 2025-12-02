@@ -27,6 +27,8 @@ async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
   }
 }
 
+export const revalidate = 0;
+
 export default async function DashboardPage() {
   const [summary, leaderboard] = await Promise.all([fetchSummary(), fetchLeaderboard()]);
 

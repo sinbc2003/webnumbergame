@@ -15,6 +15,8 @@ async function fetchRooms(): Promise<Room[]> {
   }
 }
 
+export const revalidate = 0;
+
 export default async function RoomsPage() {
   const rooms = await fetchRooms();
   return (
