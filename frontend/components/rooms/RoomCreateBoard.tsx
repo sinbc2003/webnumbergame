@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
+import { useRouter } from "next/navigation";
 
 import api from "@/lib/api";
 import type { Room, RoundType } from "@/types/api";
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export default function RoomCreateBoard({ onCreated }: Props) {
+  const router = useRouter();
   const [mode, setMode] = useState(MODE_OPTIONS[0]);
   const [size, setSize] = useState(SIZE_OPTIONS[0]);
   const [name, setName] = useState("");
@@ -42,7 +44,7 @@ export default function RoomCreateBoard({ onCreated }: Props) {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!mode.roundType) {
-      transition(() => window.location.assign("/tournaments/create"));
+      transition(() => router.push("/tournaments/create"));
       return;
     }
     setSubmitting(true);
@@ -56,7 +58,7 @@ export default function RoomCreateBoard({ onCreated }: Props) {
       const { data } = await api.post<Room>("/rooms", payload);
       onCreated?.(data);
       setStatusMessage("방이 생성되었습니다.");
-      transition(() => window.location.assign(`/rooms/${data.id}`));
+      transition(() => router.push(`/rooms/${data.id}`));
     } catch (error: any) {
       setStatusMessage(error?.response?.data?.detail ?? "방 생성에 실패했습니다.");
     } finally {
