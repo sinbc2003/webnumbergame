@@ -29,6 +29,7 @@ class RoomService:
             description=payload.description,
             host_id=host.id,
             round_type=payload.round_type,
+            max_players=settings.max_room_capacity,
             player_one_id=host.id,
         )
         self.session.add(room)

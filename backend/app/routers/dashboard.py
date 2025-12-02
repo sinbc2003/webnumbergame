@@ -38,6 +38,7 @@ async def get_leaderboard(session: AsyncSession = Depends(get_session), limit: i
     batch_limit = min(max(limit * 5, limit), 200)
     statement = (
         select(User)
+        .where(User.is_admin.is_(False))
         .order_by(User.win_count.desc(), User.total_score.desc())
         .limit(batch_limit)
     )
@@ -51,6 +52,9 @@ async def get_leaderboard(session: AsyncSession = Depends(get_session), limit: i
         accuracy_points = max(0, user.total_score // ACCURACY_DIVIDER)
         activity_points = total_matches * ACTIVITY_WEIGHT
         performance_score = win_points + accuracy_points + activity_points
+        if performance_score <= 0:
+            continue
+
         enriched.append(
             LeaderboardEntry(
                 user_id=user.id,

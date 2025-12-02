@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,7 @@ class RoomPublic(BaseModel):
     host_id: str
     status: RoomStatus
     round_type: RoundType
+    max_players: int
     current_round: int
     player_one_id: str | None
     player_two_id: str | None

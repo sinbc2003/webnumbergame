@@ -20,6 +20,7 @@ class Room(SQLModel, table=True):
     round_type: RoundType = Field(default=RoundType.ROUND1_INDIVIDUAL)
     tournament_id: Optional[str] = Field(default=None, foreign_key="tournaments.id")
     expires_at: Optional[datetime] = Field(default=None)
+    max_players: int = Field(default=16)
     player_one_id: str | None = Field(default=None, foreign_key="users.id")
     player_two_id: str | None = Field(default=None, foreign_key="users.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
