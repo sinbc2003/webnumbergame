@@ -91,6 +91,10 @@ async def reset_arena(session: AsyncSession = Depends(get_session)) -> ResetSumm
     room_ids_result = await session.execute(select(Room.id))
     room_ids = [row[0] for row in room_ids_result.fetchall()]
 
+    # 매치가 우승 제출을 참조하고 있으면 submissions를 먼저 삭제할 수 없으므로
+    # winning_submission_id를 비워 순환 참조를 끊는다.
+    await session.execute(sa_update(Match).values(winning_submission_id=None))
+
     # 삭제 순서는 외래키 제약 조건을 위배하지 않도록
     # Room 을 참조하는 엔터티들을 먼저 정리한 뒤,
     # Tournament 등 상위 개체를 삭제하는 순서로 정렬한다.
@@ -117,7 +121,11 @@ async def reset_arena(session: AsyncSession = Depends(get_session)) -> ResetSumm
         deleted[label] = count
 
     # 기존 사용자(관리자 제외) 제거 후 깨끗한 상태에서 다시 시작
-    await session.execute(sa_delete(User).where(User.is_admin.is_(False)))
+    user_count_statement = select(func.count()).select_from(User).where(User.is_admin.is_(False))
+    user_count = (await session.execute(user_count_statement)).scalar_one()
+    if user_count:
+        await session.execute(sa_delete(User).where(User.is_admin.is_(False)))
+    deleted["users"] = user_count
 
     await session.commit()
 
