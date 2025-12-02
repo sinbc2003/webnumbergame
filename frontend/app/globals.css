@@ -25,6 +25,9 @@ body {
     );
   background-attachment: fixed;
   letter-spacing: 0.03em;
+  cursor:
+    url("/cursor.png") 4 1,
+    auto;
 }
 
 .bnet-shell {
