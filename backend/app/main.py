@@ -99,6 +99,7 @@ def create_app() -> FastAPI:
                 if not message:
                     continue
                 sanitized = message[:500]
+                client_id = payload.get("client_id")
                 await manager.broadcast_lobby(
                     {
                         "type": "chat",
@@ -106,6 +107,7 @@ def create_app() -> FastAPI:
                         "user_id": user.id,
                         "message": sanitized,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "client_id": client_id,
                     }
                 )
         except WebSocketDisconnect:

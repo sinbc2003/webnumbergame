@@ -11,6 +11,7 @@ type LobbyMessage = {
   userId: string;
   message: string;
   timestamp: string;
+  clientId?: string;
 };
 
 type LobbyUser = {
@@ -45,6 +46,7 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
   const [roster, setRoster] = useState<LobbyUser[]>([]);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const pendingIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user || !token) {
@@ -74,12 +76,17 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
       try {
         const payload = JSON.parse(event.data);
         if (payload.type === "chat") {
+          if (payload.client_id && pendingIdsRef.current.has(payload.client_id)) {
+            pendingIdsRef.current.delete(payload.client_id);
+            return;
+          }
           const entry: LobbyMessage = {
             id: `${payload.timestamp ?? Date.now()}-${payload.user_id ?? Math.random()}`,
             user: payload.user ?? "Unknown",
             userId: payload.user_id ?? "unknown",
             message: payload.message ?? "",
             timestamp: payload.timestamp ?? new Date().toISOString(),
+            clientId: payload.client_id,
           };
           setMessages((prev) => [...prev.slice(-99), entry]);
         } else if (payload.type === "roster" && Array.isArray(payload.users)) {
@@ -108,10 +115,25 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
     if (!trimmed || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       return;
     }
+    const clientId =
+      typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `local-${Date.now()}`;
+    pendingIdsRef.current.add(clientId);
+    setMessages((prev) => [
+      ...prev.slice(-99),
+      {
+        id: clientId,
+        user: user?.username ?? "나",
+        userId: user?.id ?? "me",
+        message: trimmed,
+        timestamp: new Date().toISOString(),
+        clientId,
+      },
+    ]);
     wsRef.current.send(
       JSON.stringify({
         type: "chat",
         message: trimmed,
+        client_id: clientId,
       }),
     );
   };

@@ -17,14 +17,13 @@ type NavButton = {
 };
 
 const NAV_BUTTONS: NavButton[] = [
-  { id: "channel", label: "Channel", hint: "HOME", href: "/dashboard" },
-  { id: "rooms", label: "Rooms", hint: "MATCH", href: "/rooms" },
-  { id: "forge", label: "Forge", hint: "BUILD", href: "/tournaments/create" },
-  { id: "league", label: "League", hint: "RANK", href: "/tournaments" },
-  { id: "quit", label: "Quit", hint: "EXIT", action: "quit" },
+  { id: "solo", label: "개인전", hint: "ROUND1", href: "/rooms" },
+  { id: "tournament", label: "토너먼트 전", hint: "ROUND2", href: "/tournaments" },
+  { id: "ranking", label: "랭킹", hint: "RANK", href: "/rankings" },
+  { id: "logout", label: "로그아웃", hint: "EXIT", action: "quit" },
 ];
 
-const ADMIN_BUTTON: NavButton = { id: "ops", label: "Ops", hint: "ADMIN", href: "/admin" };
+const ADMIN_BUTTON: NavButton = { id: "ops", label: "관리", hint: "ADMIN", href: "/admin" };
 const BADGE_SEQUENCE = ["gm", "diamond", "platinum", "gold", "silver", "bronze"];
 
 interface Props {
@@ -48,6 +47,7 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
   const { messages, roster, connected, sendMessage } = useLobby();
   const [chatInput, setChatInput] = useState("");
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const showContent = Boolean(children);
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -134,7 +134,7 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
             })}
           </aside>
           <main className="bnet-main">
-            <section className="bnet-console">
+            <section className={clsx("bnet-console", !showContent && "bnet-console--full")}>
               <div className="bnet-console__header">
                 <div>
                   <p className="bnet-console__title">{pageTitle}</p>
@@ -172,7 +172,7 @@ export default function MathNetworkShell({ children, pageTitle = "MathGame Comma
                 </form>
               </div>
             </section>
-            <section className="bnet-content">{children}</section>
+            {showContent && <section className="bnet-content">{children}</section>}
           </main>
           <aside className="bnet-roster">
             <div className="bnet-roster__title">
