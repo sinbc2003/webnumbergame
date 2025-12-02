@@ -133,7 +133,7 @@ export default function RoomGamePanel({ room, participants }: Props) {
   const initialPlayerTwo = room.player_two_id ?? undefined;
   const { user } = useAuth();
   const router = useRouter();
-  const isTeamRound = roundType === "round2_team";
+  const isTeamRound = roundType === "team_2v2" || roundType === "team_4v4";
   const [playerOne, setPlayerOne] = useState<string | undefined>(initialPlayerOne);
   const [playerTwo, setPlayerTwo] = useState<string | undefined>(initialPlayerTwo);
   const [boards, setBoards] = useState<{ playerOne: BoardState; playerTwo: BoardState }>({

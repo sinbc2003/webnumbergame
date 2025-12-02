@@ -5,14 +5,22 @@ import clsx from "clsx";
 import Link from "next/link";
 import useSWR from "swr";
 
-import type { Participant, Room } from "@/types/api";
+import type { Participant, Room, RoundType } from "@/types/api";
 import api from "@/lib/api";
 import RoomCreateBoard from "./RoomCreateBoard";
 
-const roundLabels: Record<string, string> = {
-  round1_individual: "1vs1 개인전",
-  round2_team: "팀전",
+const roundLabels: Partial<Record<RoundType, string>> = {
+  solo_1v1: "1vs1 개인전",
+  relay_2v2: "2vs2 릴레이",
+  relay_3v3: "3vs3 릴레이",
+  relay_4v4: "4vs4 릴레이",
+  team_2v2: "2vs2 팀전",
+  team_4v4: "4vs4 팀전",
+  tournament_1v1: "토너먼트 1vs1",
 };
+
+const soloModes: RoundType[] = ["solo_1v1", "relay_2v2", "relay_3v3", "relay_4v4", "tournament_1v1"];
+const teamModes: RoundType[] = ["team_2v2", "team_4v4"];
 
 const fetchParticipants = async (roomId: string) => {
   const { data } = await api.get<Participant[]>(`/rooms/${roomId}/participants`);
@@ -61,7 +69,9 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
       const matchesSearch = room.name.toLowerCase().includes(search.trim().toLowerCase());
       if (!matchesSearch) return false;
       if (modeFilter === "all") return true;
-      return modeFilter === "solo" ? room.round_type === "round1_individual" : room.round_type === "round2_team";
+      return modeFilter === "solo"
+        ? soloModes.includes(room.round_type)
+        : teamModes.includes(room.round_type);
     });
   }, [rooms, search, modeFilter]);
   const selectedRoom = filtered.find((room) => room.id === selectedRoomId) ?? filtered[0];
@@ -122,7 +132,7 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
               >
                 <span className="room-list__players">-- / {room.max_players}</span>
                 <span className="room-list__name">{room.name}</span>
-                <span>{roundLabels[room.round_type] ?? room.round_type}</span>
+                <span>{roundLabels[room.round_type as RoundType] ?? room.round_type}</span>
                 <span>{new Date(room.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
               </button>
             ))}
@@ -134,7 +144,7 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
         {selectedRoom ? (
           <>
             <p className="room-join__title">{selectedRoom.name}</p>
-            <p className="room-join__label">{roundLabels[selectedRoom.round_type] ?? selectedRoom.round_type}</p>
+            <p className="room-join__label">{roundLabels[selectedRoom.round_type as RoundType] ?? selectedRoom.round_type}</p>
             <dl className="room-join__meta">
               <div>
                 <dt>Players</dt>

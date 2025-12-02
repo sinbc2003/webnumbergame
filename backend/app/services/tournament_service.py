@@ -110,7 +110,7 @@ class TournamentService:
                     tournament_id=tournament.id,
                     round_index=round_index,
                     matchup_index=matchup_index + 1,
-                    round_type=RoundType.ROUND1_INDIVIDUAL if round_index == 1 else RoundType.ROUND2_TEAM,
+                    round_type=RoundType.TOURNAMENT_1V1,
                 )
                 self.session.add(match)
                 matchups.append(match)
@@ -167,7 +167,7 @@ class TournamentService:
             description=f"시드 {slot_a.position} vs {slot_b.position}",
             host_id=slot_a.user_id,
             status=RoomStatus.WAITING,
-            round_type=RoundType.ROUND1_INDIVIDUAL,
+            round_type=RoundType.TOURNAMENT_1V1,
             max_players=32,
             tournament_id=tournament.id,
             player_one_id=slot_a.user_id,

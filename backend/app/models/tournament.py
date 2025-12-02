@@ -41,7 +41,7 @@ class TournamentMatch(SQLModel, table=True):
     round_index: int
     matchup_index: int
     room_id: str | None = Field(default=None, foreign_key="rooms.id")
-    round_type: RoundType = Field(default=RoundType.ROUND1_INDIVIDUAL)
+    round_type: RoundType = Field(default=RoundType.TOURNAMENT_1V1)
     winner_slot: int | None = Field(default=None)
     player_one_id: str | None = Field(default=None, foreign_key="users.id")
     player_two_id: str | None = Field(default=None, foreign_key="users.id")

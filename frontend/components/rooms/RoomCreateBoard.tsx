@@ -89,7 +89,10 @@ export default function RoomCreateBoard({ onCreated }: Props) {
             <button
               key={option.id}
               type="button"
-              onClick={() => setMode(option)}
+              onClick={() => {
+                setMode(option);
+                setVariant(option.roundType ?? option.variants?.[0]?.roundType ?? null);
+              }}
               className={clsx("mode-card", option.id === mode.id && "mode-card--active")}
             >
               <span className="mode-card__label">{option.label}</span>
