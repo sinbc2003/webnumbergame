@@ -14,17 +14,31 @@ const MODE_OPTIONS: Array<{
   label: string;
   description: string;
   roundType: RoundType | null;
-  accent: string;
+  variants?: Array<{ id: string; label: string; roundType: RoundType }>;
 }> = [
-  { id: "solo", label: "개인전", description: "1v1 래더 모드", roundType: "round1_individual", accent: "emerald" },
-  { id: "team", label: "팀전", description: "협동 2v2 / 4v4", roundType: "round2_team", accent: "indigo" },
-  { id: "tournament", label: "토너먼트", description: "브래킷 기반 대회 생성", roundType: null, accent: "amber" },
-];
-
-const SIZE_OPTIONS = [
-  { id: "1v1", label: "1 vs 1", slots: 2, hint: "듀얼" },
-  { id: "2v2", label: "2 vs 2", slots: 4, hint: "소규모 전투" },
-  { id: "4v4", label: "4 vs 4", slots: 8, hint: "대규모 협동" },
+  {
+    id: "solo",
+    label: "릴레이 개인전",
+    description: "킹오브파이터식 릴레이",
+    roundType: "solo_1v1",
+    variants: [
+      { id: "solo_1v1", label: "1 vs 1", roundType: "solo_1v1" },
+      { id: "relay_2v2", label: "2 vs 2 릴레이", roundType: "relay_2v2" },
+      { id: "relay_3v3", label: "3 vs 3 릴레이", roundType: "relay_3v3" },
+      { id: "relay_4v4", label: "4 vs 4 릴레이", roundType: "relay_4v4" },
+    ],
+  },
+  {
+    id: "team",
+    label: "팀전",
+    description: "코스트 분배 협동전",
+    roundType: "team_2v2",
+    variants: [
+      { id: "team_2v2", label: "2 vs 2", roundType: "team_2v2" },
+      { id: "team_4v4", label: "4 vs 4", roundType: "team_4v4" },
+    ],
+  },
+  { id: "tournament", label: "토너먼트", description: "1v1 싱글 브래킷", roundType: null },
 ];
 
 interface Props {
@@ -34,7 +48,7 @@ interface Props {
 export default function RoomCreateBoard({ onCreated }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState(MODE_OPTIONS[0]);
-  const [size, setSize] = useState(SIZE_OPTIONS[0]);
+  const [variant, setVariant] = useState<RoundType | null>(mode.roundType);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -43,7 +57,7 @@ export default function RoomCreateBoard({ onCreated }: Props) {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!mode.roundType) {
+    if (!variant) {
       transition(() => router.push("/tournaments/create"));
       return;
     }
@@ -53,7 +67,7 @@ export default function RoomCreateBoard({ onCreated }: Props) {
       const payload = {
         name: name.trim() || `[${size.label}] 커스텀 방`,
         description: `${mode.label} · ${size.label}${description ? ` · ${description.trim()}` : ""}`,
-        round_type: mode.roundType,
+        round_type: variant,
       };
       const { data } = await api.post<Room>("/rooms", payload);
       onCreated?.(data);
@@ -94,22 +108,23 @@ export default function RoomCreateBoard({ onCreated }: Props) {
         </div>
       ) : (
         <form className="room-create__panel space-y-4" onSubmit={handleSubmit}>
-          <div>
-            <p className="room-create__title">게임 크기</p>
-            <div className="room-create__sizes">
-              {SIZE_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setSize(option)}
-                  className={clsx("size-chip", option.id === size.id && "size-chip--active")}
-                >
-                  <span>{option.label}</span>
-                  <span className="size-chip__meta">{option.hint}</span>
-                </button>
-              ))}
+          {mode.variants && (
+            <div>
+              <p className="room-create__title">세부 모드</p>
+              <div className="room-create__sizes">
+                {mode.variants.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setVariant(item.roundType)}
+                    className={clsx("size-chip", variant === item.roundType && "size-chip--active")}
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           <label className="room-create__field">
             <span>방 이름</span>
             <input value={name} onChange={(event) => setName(event.target.value)} placeholder="예: 2v2 FAST GAME" />

@@ -9,7 +9,7 @@ from ..enums import RoomStatus, RoundType, ParticipantRole
 class RoomCreate(BaseModel):
     name: str
     description: str | None = None
-    round_type: RoundType = RoundType.ROUND1_INDIVIDUAL
+    round_type: RoundType = RoundType.SOLO_1V1
 
 
 class RoomPublic(BaseModel):

@@ -1,5 +1,12 @@
 export type RoomStatus = "waiting" | "in_progress" | "completed" | "archived";
-export type RoundType = "round1_individual" | "round2_team";
+export type RoundType =
+  | "solo_1v1"
+  | "relay_2v2"
+  | "relay_3v3"
+  | "relay_4v4"
+  | "team_2v2"
+  | "team_4v4"
+  | "tournament_1v1";
 
 export interface User {
   id: string;

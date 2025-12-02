@@ -9,8 +9,13 @@ class RoomStatus(str, Enum):
 
 
 class RoundType(str, Enum):
-    ROUND1_INDIVIDUAL = "round1_individual"
-    ROUND2_TEAM = "round2_team"
+    SOLO_1V1 = "solo_1v1"
+    RELAY_2V2 = "relay_2v2"
+    RELAY_3V3 = "relay_3v3"
+    RELAY_4V4 = "relay_4v4"
+    TEAM_2V2 = "team_2v2"
+    TEAM_4V4 = "team_4v4"
+    TOURNAMENT_1V1 = "tournament_1v1"
 
 
 class MatchStatus(str, Enum):
