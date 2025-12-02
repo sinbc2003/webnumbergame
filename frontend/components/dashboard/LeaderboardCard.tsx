@@ -21,7 +21,6 @@ const badgeFromScore = (score: number) => {
 };
 
 export default function LeaderboardCard({ entries }: Props) {
-  const topTen = entries.slice(0, 10);
   return (
     <div className="ladder-card">
       <header className="ladder-card__header">
@@ -48,7 +47,7 @@ export default function LeaderboardCard({ entries }: Props) {
             </tr>
           </thead>
           <tbody>
-            {topTen.map((entry, index) => (
+            {entries.map((entry, index) => (
               <tr key={entry.user_id} className={index === 1 ? "ladder-row--highlight" : undefined}>
                 <td className={tierColor(index + 1)}>#{index + 1}</td>
                 <td>
@@ -72,7 +71,7 @@ export default function LeaderboardCard({ entries }: Props) {
                 <td>{entry.total_score}</td>
               </tr>
             ))}
-            {topTen.length === 0 && (
+            {entries.length === 0 && (
               <tr>
                 <td colSpan={7} className="ladder-empty">
                   아직 기록이 없습니다.
