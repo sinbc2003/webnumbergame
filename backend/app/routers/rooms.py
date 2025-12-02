@@ -54,20 +54,28 @@ async def leave_room(
     await session.delete(participant)
 
     slot_changed = False
+    remaining_player_id: str | None = None
     if room.player_one_id == current_user.id:
+        remaining_player_id = room.player_two_id
         room.player_one_id = None
         slot_changed = True
-    if room.player_two_id == current_user.id:
+    elif room.player_two_id == current_user.id:
+        remaining_player_id = room.player_one_id
         room.player_two_id = None
         slot_changed = True
+
+    forfeited = False
+    if remaining_player_id:
+        forfeited = await _handle_player_forfeit(session, room, winner_user_id=remaining_player_id)
 
     if room.host_id == current_user.id:
         await session.delete(room)
         await session.commit()
-        await manager.broadcast_room(
-            room.id,
-            {"type": "room_closed", "room_id": room.id},
-        )
+        if not forfeited:
+            await manager.broadcast_room(
+                room.id,
+                {"type": "room_closed", "room_id": room.id},
+            )
         return
 
     session.add(room)
@@ -115,6 +123,43 @@ async def _ensure_host_active(session: AsyncSession, room: Room) -> None:
     await session.delete(room)
     await session.commit()
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="방이 종료되었습니다.")
+
+
+async def _handle_player_forfeit(
+    session: AsyncSession,
+    room: Room,
+    *,
+    winner_user_id: str | None,
+) -> bool:
+    if not winner_user_id:
+        return False
+
+    game_service = GameService(session)
+    match = await game_service.get_active_match(room.id)
+    if not match or match.status != MatchStatus.ACTIVE:
+        return False
+
+    closed_match = await game_service.close_match(match)
+
+    await manager.broadcast_room(
+        room.id,
+        _round_finished_payload(
+            room.id,
+            closed_match.id,
+            None,
+            reason="forfeit",
+            winner_user_id=winner_user_id,
+        ),
+    )
+    await _finalize_room(
+        session,
+        room,
+        closed_match,
+        None,
+        reason="forfeit",
+        winner_user_id=winner_user_id,
+    )
+    return True
 
 
 async def _set_participant_role(
@@ -368,7 +413,14 @@ def _serialize_submission(submission: Submission) -> dict:
     }
 
 
-def _round_finished_payload(room_id: str, match_id: str, submission: Submission | None, reason: str) -> dict:
+def _round_finished_payload(
+    room_id: str,
+    match_id: str,
+    submission: Submission | None,
+    reason: str,
+    *,
+    winner_user_id: str | None = None,
+) -> dict:
     payload = {
         "type": "round_finished",
         "room_id": room_id,
@@ -378,6 +430,8 @@ def _round_finished_payload(room_id: str, match_id: str, submission: Submission 
     }
     if submission:
         payload["winner_submission"] = _serialize_submission(submission)
+    final_winner = winner_user_id or (submission.user_id if submission else None)
+    payload["winner_user_id"] = final_winner
     return payload
 
 
@@ -410,8 +464,10 @@ async def _finalize_room(
     match: Match,
     winning_submission: Submission | None,
     reason: str,
+    *,
+    winner_user_id: str | None = None,
 ) -> None:
-    winner_id = winning_submission.user_id if winning_submission else None
+    winner_id = winner_user_id or (winning_submission.user_id if winning_submission else None)
     participants = {room.player_one_id, room.player_two_id}
     loser_id = None
     if winner_id and winner_id in participants:

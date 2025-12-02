@@ -20,6 +20,7 @@ type RoomEventPayload = {
   user_id?: string;
   expression?: string;
   reason?: string;
+  winner_user_id?: string | null;
   winner_submission_id?: string | null;
   submission?: {
     expression: string;
@@ -156,6 +157,7 @@ export default function RoomGamePanel({
   });
   const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null);
   const [preCountdown, setPreCountdown] = useState<number | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const userInteractedRef = useRef(false);
@@ -325,6 +327,49 @@ export default function RoomGamePanel({
     [participantState],
   );
 
+  const handleLeaveRoom = useCallback(async () => {
+    if (leaving) return;
+
+    const confirmed =
+      typeof window === "undefined" ? true : window.confirm("방을 나가시겠습니까? 진행 중이면 기권 처리됩니다.");
+    if (!confirmed) {
+      return;
+    }
+
+    setStatusError(null);
+    setStatusMessage(null);
+
+    if (!user) {
+      router.push("/rooms");
+      return;
+    }
+
+    try {
+      setLeaving(true);
+      await api.delete(`/rooms/${roomId}/participants/me`);
+      router.push("/rooms");
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        router.push("/rooms");
+      } else {
+        setStatusError(err?.response?.data?.detail ?? "방 나가기 중 오류가 발생했습니다.");
+      }
+    } finally {
+      setLeaving(false);
+    }
+  }, [leaving, roomId, router, user]);
+
+  const renderLeaveButton = () => (
+    <button
+      type="button"
+      onClick={handleLeaveRoom}
+      disabled={leaving}
+      className="rounded-md border border-red-500/60 px-3 py-1 text-xs font-semibold text-red-100 transition hover:border-red-400 hover:text-white disabled:opacity-60"
+    >
+      {leaving ? "나가는 중..." : "방 나가기"}
+    </button>
+  );
+
   useEffect(() => {
     if (!user) return;
     const ws = new WebSocket(wsUrl);
@@ -439,7 +484,8 @@ export default function RoomGamePanel({
           case "round_finished": {
             const reason = payload.reason ?? "optimal";
             const winnerSubmission = payload.winner_submission;
-            const winnerId = winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
+            const winnerId =
+              payload.winner_user_id ?? winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
             setRoundOutcome({
               reason,
               winnerId,
@@ -456,26 +502,43 @@ export default function RoomGamePanel({
             if (winnerId) {
               const winnerLabel = participantLabel(winnerId);
               if (winnerId === user?.id) {
-                setStatusMessage(reason === "timeout" ? "시간 종료! 근사 정답으로 승리했습니다." : "정답으로 승리했습니다!");
+                const message =
+                  reason === "timeout"
+                    ? "시간 종료! 근사 정답으로 승리했습니다."
+                    : reason === "forfeit"
+                      ? "상대가 나가 기권승으로 처리되었습니다."
+                      : "정답으로 승리했습니다!";
+                setStatusMessage(message);
                 setStatusError(null);
                 playTone("success");
               } else {
-                setStatusError(
+                const message =
                   reason === "timeout"
                     ? `${winnerLabel} 님이 더 가까운 해답을 제출했습니다.`
-                    : `${winnerLabel} 님이 정답을 찾아 라운드가 종료되었습니다.`,
-                );
+                    : reason === "forfeit"
+                      ? `${winnerLabel} 님이 남아 있어 승리했습니다.`
+                      : `${winnerLabel} 님이 정답을 찾아 라운드가 종료되었습니다.`;
+                setStatusError(message);
                 playTone("error");
               }
-            } else {
+            } else if (reason === "timeout") {
               setStatusMessage("시간 종료! 제출된 식이 없어 무승부입니다.");
+              setStatusError(null);
+            } else if (reason === "forfeit") {
+              setStatusMessage("상대가 나가 라운드가 종료되었습니다.");
               setStatusError(null);
             }
             mutate();
             break;
           }
           case "room_closed": {
-            setStatusError("방장이 방을 종료했습니다.");
+            const closingReason = payload.reason ?? "closed";
+            if (closingReason === "forfeit") {
+              setStatusMessage("상대가 방을 떠나 경기가 종료되었습니다.");
+              setStatusError(null);
+            } else {
+              setStatusError("방장이 방을 종료했습니다.");
+            }
             setTimeout(() => router.push("/rooms"), 1000);
             break;
           }
@@ -618,6 +681,7 @@ export default function RoomGamePanel({
   if (isPlayerView && activeMatch) {
     return (
       <div className={containerClass}>
+        <div className="mb-3 flex justify-end">{renderLeaveButton()}</div>
         <div className="grid gap-3 rounded-2xl border-2 border-amber-400/60 bg-night-900/60 p-5 text-sm text-night-200 sm:grid-cols-3">
           <div>
             <p className="text-amber-400 text-sm font-semibold">현재 문제</p>
@@ -698,15 +762,18 @@ export default function RoomGamePanel({
 
   return (
     <div className={containerClass}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-white">실시간 경기</h2>
-        <span
-          className={`rounded-full border px-3 py-0.5 text-xs ${
-            hasActiveMatch ? "border-emerald-500 text-emerald-300" : "border-night-700 text-night-400"
-          }`}
-        >
-          {hasActiveMatch ? "진행 중" : "대기 중"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-full border px-3 py-0.5 text-xs ${
+              hasActiveMatch ? "border-emerald-500 text-emerald-300" : "border-night-700 text-night-400"
+            }`}
+          >
+            {hasActiveMatch ? "진행 중" : "대기 중"}
+          </span>
+          {renderLeaveButton()}
+        </div>
       </div>
       {!user && <p className="text-sm text-night-400">로그인 후 이용할 수 있습니다.</p>}
 
@@ -725,7 +792,11 @@ export default function RoomGamePanel({
       {roundOutcome && (
         <div className="rounded-lg border border-night-800 bg-night-900/40 p-4 text-sm text-night-200">
           <p className="font-semibold text-night-100">
-            {roundOutcome.reason === "timeout" ? "시간 종료 결과" : "라운드 결과"}
+            {roundOutcome.reason === "timeout"
+              ? "시간 종료 결과"
+              : roundOutcome.reason === "forfeit"
+                ? "상대 기권 승리"
+                : "라운드 결과"}
           </p>
           <p className="mt-1 text-night-300">
             승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
