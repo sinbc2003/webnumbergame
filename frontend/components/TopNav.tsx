@@ -297,7 +297,9 @@ export default function MathNetworkShell({
               {decoratedRoster.map((player) => (
                 <li key={player.user_id} className="bnet-roster__item">
                   <div className="bnet-roster__identity">
-                    <span className={clsx("bnet-roster__badge", `badge-${player.badge}`)} />
+                    <span className={clsx("bnet-roster__badge", `badge-${player.badge}`)}>
+                      {player.badge.toUpperCase()}
+                    </span>
                     <div>
                       <p className="bnet-roster__name">{player.username}</p>
                       <p className="bnet-roster__clan">{player.user_id.slice(0, 8)}</p>
