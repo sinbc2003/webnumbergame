@@ -459,11 +459,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       .map((entry) => entry.participant);
   }, [participantState]);
 
-  const spectatorQueue = useMemo(
-    () => participantQueue.filter((participant) => participant.role !== "player"),
-    [participantQueue],
-  );
-
   const canSendChat = Boolean(user);
 
   const refreshRoomSnapshot = useCallback(async () => {
@@ -1141,7 +1136,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
         </div>
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
-        <div className={`mt-6 grid gap-6 ${roundOutcome ? "lg:grid-cols-[3fr,1.5fr]" : ""}`}>
+        <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)]">
           <div className="space-y-4">
             {renderScoreboardPanel()}
             <div className="rounded-2xl border border-night-800/70 bg-night-950/30 p-5">
@@ -1200,40 +1195,15 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               </div>
             </div>
 
-            <div className="rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-white">관전자 슬롯</p>
-                <span className="text-xs text-night-500">{spectatorQueue.length}명</span>
-              </div>
-              <div className="mt-4 grid max-h-[360px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
-                {spectatorQueue.length === 0 && (
-                  <p className="rounded-xl border border-night-800/60 bg-night-950/40 p-3 text-xs text-night-500">관전자가 없습니다.</p>
-                )}
-                {spectatorQueue.map((spectator) => (
-                  <div
-                    key={`spectator-${spectator.id}`}
-                    className="rounded-xl border border-night-800/70 bg-night-950/50 p-3 text-xs text-night-300"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-white">{spectator.username ?? spectator.user_id.slice(0, 6)}</p>
-                      <span className="text-[10px] text-night-500">#{participantOrder(spectator.user_id) ?? "-"}</span>
-                    </div>
-                    <p className="text-[11px] text-night-500">
-                      {spectator.user_id === room.host_id ? "방장" : spectator.role === "player" ? "플레이어" : "관전자"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200">
+          <div className="flex min-h-[420px] flex-col gap-4">
+            <div className="flex flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-white">방 채팅</p>
                 <span className="text-xs text-night-500">실시간 대화</span>
               </div>
               <div
                 ref={chatBodyRef}
-                className="mt-3 h-64 space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
+                className="mt-3 flex-1 min-h-[220px] space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
               >
                 {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
                 {chatMessages.map((message) => (
@@ -1268,9 +1238,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 <p className="mt-3 text-xs text-night-500">로그인 후 대화에 참여할 수 있습니다.</p>
               )}
             </div>
-          </div>
-          {roundOutcome && (
-            <div className="space-y-4">
+            {roundOutcome && (
               <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
                 <p className="font-semibold">
                   {roundOutcome.reason === "timeout"
@@ -1286,8 +1254,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   <p className="text-xs text-amber-200/70">목표와의 차이 {roundOutcome.distance}</p>
                 )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
         </div>
       </div>
     );

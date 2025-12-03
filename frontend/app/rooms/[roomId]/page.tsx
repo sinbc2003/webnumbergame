@@ -45,7 +45,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
 
   return (
     <TopNav layout="focus" showChat={false} hideFocusHeader>
-      <main className="mx-auto max-w-6xl py-6">
+      <main className="mx-auto max-w-6xl pb-6 pt-3 sm:pt-4">
         <RoomPageShell room={room} participants={participants} />
       </main>
     </TopNav>
