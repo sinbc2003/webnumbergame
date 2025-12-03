@@ -639,6 +639,7 @@ body.focus-shell-compact .focus-shell__content {
   flex-direction: column;
   gap: 1.5rem;
   height: 100%;
+  min-height: 0;
 }
 
 .room-hub__tabs {
@@ -668,6 +669,7 @@ body.focus-shell-compact .focus-shell__content {
   grid-template-columns: 2fr 1fr;
   gap: 1.5rem;
   height: calc(100vh - 280px);
+  min-height: 0;
 }
 
 .room-join__list {
@@ -677,6 +679,8 @@ body.focus-shell-compact .focus-shell__content {
   background: rgba(6, 9, 18, 0.8);
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
 .room-list__toolbar {
@@ -727,6 +731,7 @@ body.focus-shell-compact .focus-shell__content {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .room-list__header {
@@ -742,7 +747,9 @@ body.focus-shell-compact .focus-shell__content {
 
 .room-list__body {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  padding-right: 0.35rem;
 }
 
 .room-list__row {

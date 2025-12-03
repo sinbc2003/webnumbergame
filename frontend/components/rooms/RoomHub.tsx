@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
 
 import type { Participant, Room } from "@/types/api";
@@ -49,6 +50,7 @@ export default function RoomHub({ initialRooms, view, showTabs = false }: RoomHu
 }
 
 function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [modeFilter, setModeFilter] = useState<"all" | "solo" | "team">("all");
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(rooms[0]?.id ?? null);
@@ -115,6 +117,7 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
                 type="button"
                 className={clsx("room-list__row", selectedRoom?.id === room.id && "active")}
                 onClick={() => setSelectedRoomId(room.id)}
+                onDoubleClick={() => router.push(`/rooms/${room.id}`)}
               >
                 <span className="room-list__players">-- / {room.max_players}</span>
                 <span className="room-list__name">{room.name}</span>
