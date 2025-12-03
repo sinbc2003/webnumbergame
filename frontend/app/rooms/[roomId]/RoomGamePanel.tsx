@@ -983,7 +983,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       })
     : [];
   const lobbyShellClass =
-    "relative flex h-[66vh] min-h-[520px] max-h-[85vh] flex-col gap-4 overflow-hidden rounded-[30px] border border-night-800/80 bg-[rgba(5,10,20,0.85)] p-5 text-night-100 shadow-[0_25px_70px_rgba(0,0,0,0.6)]";
+    "relative space-y-6 rounded-[30px] border border-night-800/80 bg-[rgba(5,10,20,0.85)] p-6 text-night-100 shadow-[0_25px_70px_rgba(0,0,0,0.6)]";
 
   const containerClass = isPlayerView
     ? "fixed inset-0 z-40 mx-auto flex w-full max-w-6xl flex-col bg-[#050a15] px-3 py-4 text-white sm:px-5 sm:py-5"
@@ -1192,7 +1192,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             </div>
           </div>
 
-          <div className="flex w-full flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200 lg:max-h-[66vh] lg:overflow-hidden">
+          <div className="flex w-full flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-white">방 채팅</p>
               <span className="text-xs text-night-500">실시간 대화</span>
