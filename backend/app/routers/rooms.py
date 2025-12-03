@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
@@ -72,6 +72,7 @@ async def leave_room(
         forfeited = await _handle_player_forfeit(session, room, winner_user_id=remaining_player_id)
 
     if room.host_id == current_user.id:
+        await session.execute(delete(RoomParticipant).where(RoomParticipant.room_id == room.id))
         await session.delete(room)
         await session.commit()
         reason = "host_left_forfeit" if forfeited else "host_left"
