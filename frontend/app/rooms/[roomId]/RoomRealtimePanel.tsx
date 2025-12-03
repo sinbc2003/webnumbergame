@@ -9,14 +9,6 @@ import { getRuntimeConfig } from "@/lib/runtimeConfig";
 import { describeRoomMode } from "@/lib/roomLabels";
 import type { Participant, Room } from "@/types/api";
 
-interface RoomChatMessage {
-  id: string;
-  userId: string;
-  username: string;
-  message: string;
-  timestamp: string;
-}
-
 interface Props {
   room: Room;
   participants: Participant[];
@@ -36,10 +28,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const roomCode = room.code;
   const hostId = room.host_id;
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
-  const [chatMessages, setChatMessages] = useState<RoomChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatSending, setChatSending] = useState(false);
-  const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
   const [roundNumber, setRoundNumber] = useState(room.current_round);
   const [durationMinutes, setDurationMinutes] = useState(3);
   const [problemCount, setProblemCount] = useState(5);
@@ -50,7 +38,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const [playerTwo, setPlayerTwo] = useState<string | undefined>(room.player_two_id ?? undefined);
   const [participantList, setParticipantList] = useState<Participant[]>(participants);
   const joinStateRef = useRef<{ userId?: string; joined: boolean }>({ joined: false });
-  const chatBodyRef = useRef<HTMLDivElement | null>(null);
 
   const { user } = useAuth();
   const router = useRouter();
@@ -150,20 +137,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         } else if (data.type === "room_closed") {
           setError("방장이 방을 종료했습니다.");
           setTimeout(() => router.push("/rooms"), 1000);
-        } else if (data.type === "chat_message") {
-          setChatMessages((prev) => {
-            const next = [
-              ...prev,
-              {
-                id: data.message_id ?? `${Date.now()}-${prev.length}`,
-                userId: data.user_id ?? "unknown",
-                username: data.username ?? "익명",
-                message: data.message ?? "",
-                timestamp: data.timestamp ?? new Date().toISOString(),
-              },
-            ];
-            return next.slice(-50);
-          });
         }
       } catch {
         // ignore malformed payloads
@@ -226,42 +199,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         : "border-amber-400 text-amber-200";
   const mapName = room.description?.trim() || "추억의 성큰웨이 #X2";
   const hostDisplayName = displayName(participantList.find((p) => p.user_id === hostId), hostId);
-
-  const formatChatTime = (value: string) => {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-  };
-
-  const canSendChat = Boolean(user);
-
-  useEffect(() => {
-    if (!chatBodyRef.current) return;
-    chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
-  }, [chatMessages]);
-
-  const handleSendChat = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!canSendChat) {
-      setChatErrorMessage("로그인 후 대화를 보낼 수 있습니다.");
-      return;
-    }
-    const trimmed = chatInput.trim();
-    if (!trimmed) {
-      return;
-    }
-    setChatSending(true);
-    setChatErrorMessage(null);
-    try {
-      await api.post(`/rooms/${roomId}/chat`, { message: trimmed });
-      setChatInput("");
-    } catch (err: any) {
-      setChatErrorMessage(err?.response?.data?.detail ?? "메시지를 보내지 못했습니다.");
-    } finally {
-      setChatSending(false);
-    }
-  };
 
   return (
     <div className="space-y-5 text-sm text-night-200">
@@ -395,48 +332,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-white">방 채팅</p>
-          <span className="text-xs text-night-500">실시간 대화</span>
-        </div>
-        <div
-          ref={chatBodyRef}
-          className="mt-3 h-64 space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
-        >
-          {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
-          {chatMessages.map((message) => (
-            <div key={message.id} className="space-y-1 rounded-xl border border-night-800/60 bg-night-900/40 p-2">
-              <div className="flex items-center justify-between text-[11px] text-night-500">
-                <span className="font-semibold text-white">{message.username}</span>
-                <span>{formatChatTime(message.timestamp)}</span>
-              </div>
-              <p className="whitespace-pre-wrap break-words text-night-100">{message.message}</p>
-            </div>
-          ))}
-        </div>
-        {chatErrorMessage && <p className="mt-2 text-xs text-red-400">{chatErrorMessage}</p>}
-        {canSendChat ? (
-          <form onSubmit={handleSendChat} className="mt-3 flex gap-2">
-            <input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              maxLength={500}
-              placeholder="메시지를 입력하세요"
-              className="flex-1 rounded-xl border border-night-800 bg-night-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={chatSending || !chatInput.trim()}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
-            >
-              {chatSending ? "전송 중..." : "전송"}
-            </button>
-          </form>
-        ) : (
-          <p className="mt-3 text-xs text-night-500">로그인 후 대화에 참여할 수 있습니다.</p>
-        )}
-      </div>
     </div>
   );
 }

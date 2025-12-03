@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import useSWR from "swr";
 import { useRouter } from "next/navigation";
@@ -49,6 +49,10 @@ type RoomEventPayload = {
     score: number;
     submitted_at: string;
   };
+  message_id?: string;
+  username?: string;
+  message?: string;
+  timestamp?: string;
 };
 
 interface HistoryEntry {
@@ -68,6 +72,14 @@ interface TeamMemberState {
   allocation: number;
   remaining: number;
   input: string;
+}
+
+interface RoomChatMessage {
+  id: string;
+  userId: string;
+  username: string;
+  message: string;
+  timestamp: string;
 }
 
 type RoundOutcome = {
@@ -208,11 +220,16 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     player_one: room.player_one_id ?? "",
     player_two: room.player_two_id ?? "",
   });
+  const [chatMessages, setChatMessages] = useState<RoomChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
 
   const playerIdsRef = useRef<{ playerOne: string | undefined; playerTwo: string | undefined }>({
     playerOne: initialPlayerOne,
     playerTwo: initialPlayerTwo,
   });
+  const chatBodyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const next = room.player_one_id ?? undefined;
@@ -232,6 +249,11 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       player_two: playerTwo ?? "",
     });
   }, [playerOne, playerTwo]);
+
+  useEffect(() => {
+    if (!chatBodyRef.current) return;
+    chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+  }, [chatMessages]);
 
   useEffect(() => {
     setParticipantState(participants);
@@ -403,6 +425,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     [participantQueue],
   );
 
+  const canSendChat = Boolean(user);
+
   const participantOptions = useMemo(
     () =>
       [{ label: "비워두기", value: "" }].concat(
@@ -414,7 +438,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     [participantQueue],
   );
 
-  const playerQueuePreview = useMemo(() => participantQueue.slice(0, 4), [participantQueue]);
   const participantOrder = useCallback(
     (userId?: string | null) => {
       if (!userId) return null;
@@ -423,6 +446,36 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     },
     [participantQueue],
   );
+
+  const handleSendChat = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!canSendChat) {
+        setChatErrorMessage("로그인 후 대화를 보낼 수 있습니다.");
+        return;
+      }
+      const trimmed = chatInput.trim();
+      if (!trimmed) return;
+      setChatSending(true);
+      setChatErrorMessage(null);
+      try {
+        await api.post(`/rooms/${roomId}/chat`, { message: trimmed });
+        setChatInput("");
+      } catch (err: any) {
+        setChatErrorMessage(err?.response?.data?.detail ?? "메시지를 보내지 못했습니다.");
+      } finally {
+        setChatSending(false);
+      }
+    },
+    [canSendChat, chatInput, roomId],
+  );
+
+  const formatChatTime = useCallback((value: string) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+  }, []);
 
   const handleLeaveRoom = useCallback(async () => {
     if (leaving) return;
@@ -668,6 +721,22 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               setStatusError("방장이 방을 종료했습니다.");
             }
             setTimeout(() => router.push("/rooms"), 1000);
+            break;
+          }
+          case "chat_message": {
+            setChatMessages((prev) => {
+              const next = [
+                ...prev,
+                {
+                  id: payload.message_id ?? `${Date.now()}-${prev.length}`,
+                  userId: payload.user_id ?? "unknown",
+                  username: payload.username ?? "익명",
+                  message: payload.message ?? "",
+                  timestamp: payload.timestamp ?? new Date().toISOString(),
+                },
+              ];
+              return next.slice(-50);
+            });
             break;
           }
           default:
@@ -943,9 +1012,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   }
 
   if (!hasActiveMatch) {
-    const spectatorCount = participantState.filter((p) => p.role !== "player").length;
-    const readyCount = participantState.filter((p) => p.is_ready).length;
-    const hostLabel = participantLabel(room.host_id);
     return (
       <div className={lobbyShellClass}>
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
@@ -965,7 +1031,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
         </div>
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[3fr,1.5fr]">
+        <div className={`mt-6 grid gap-6 ${roundOutcome ? "lg:grid-cols-[3fr,1.5fr]" : ""}`}>
           <div className="space-y-4">
             <div className="rounded-2xl border border-night-800/70 bg-night-950/30 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1021,21 +1087,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   );
                 })}
               </div>
-              <div className="mt-5 rounded-xl border border-night-800/60 bg-night-900/40 p-3">
-                <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">입장 대기열</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {playerQueuePreview.length === 0 && <span className="text-xs text-night-500">아직 입장한 사용자가 없습니다.</span>}
-                  {playerQueuePreview.map((participant) => (
-                    <span
-                      key={`queue-${participant.id}`}
-                      className="inline-flex items-center gap-1 rounded-full border border-night-700 px-3 py-1 text-xs text-night-200"
-                    >
-                      <span className="text-[10px] text-night-500">#{participantOrder(participant.user_id) ?? "-"}</span>
-                      {participant.username ?? participant.user_id.slice(0, 6)}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
 
             <div className="rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200">
@@ -1064,37 +1115,51 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               </div>
             </div>
 
-            <div className="rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-xs text-night-300">
-              <div className="grid gap-3 text-sm text-night-300 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <p className="text-night-500">참가자</p>
-                  <p className="text-lg font-semibold text-white">{participantState.length}명</p>
-                </div>
-                <div>
-                  <p className="text-night-500">관전자</p>
-                  <p className="text-lg font-semibold text-white">{spectatorCount}명</p>
-                </div>
-                <div>
-                  <p className="text-night-500">준비 완료</p>
-                  <p className="text-lg font-semibold text-emerald-300">{readyCount}명</p>
-                </div>
-                <div>
-                  <p className="text-night-500">최대 인원</p>
-                  <p className="text-lg font-semibold text-white">{room.max_players}명</p>
-                </div>
-                <div>
-                  <p className="text-night-500">호스트</p>
-                  <p className="text-lg font-semibold text-white">{hostLabel}</p>
-                </div>
-                <div>
-                  <p className="text-night-500">현재 라운드</p>
-                  <p className="text-lg font-semibold text-white">{room.current_round}</p>
-                </div>
+            <div className="rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-white">방 채팅</p>
+                <span className="text-xs text-night-500">실시간 대화</span>
               </div>
+              <div
+                ref={chatBodyRef}
+                className="mt-3 h-64 space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
+              >
+                {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
+                {chatMessages.map((message) => (
+                  <div key={message.id} className="space-y-1 rounded-xl border border-night-800/60 bg-night-900/40 p-2">
+                    <div className="flex items-center justify-between text-[11px] text-night-500">
+                      <span className="font-semibold text-white">{message.username}</span>
+                      <span>{formatChatTime(message.timestamp)}</span>
+                    </div>
+                    <p className="whitespace-pre-wrap break-words text-night-100">{message.message}</p>
+                  </div>
+                ))}
+              </div>
+              {chatErrorMessage && <p className="mt-2 text-xs text-red-400">{chatErrorMessage}</p>}
+              {canSendChat ? (
+                <form onSubmit={handleSendChat} className="mt-3 flex gap-2">
+                  <input
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    maxLength={500}
+                    placeholder="메시지를 입력하세요"
+                    className="flex-1 rounded-xl border border-night-800 bg-night-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatSending || !chatInput.trim()}
+                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
+                  >
+                    {chatSending ? "전송 중..." : "전송"}
+                  </button>
+                </form>
+              ) : (
+                <p className="mt-3 text-xs text-night-500">로그인 후 대화에 참여할 수 있습니다.</p>
+              )}
             </div>
           </div>
-          <div className="space-y-4">
-            {roundOutcome && (
+          {roundOutcome && (
+            <div className="space-y-4">
               <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
                 <p className="font-semibold">
                   {roundOutcome.reason === "timeout"
@@ -1110,8 +1175,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   <p className="text-xs text-amber-200/70">목표와의 차이 {roundOutcome.distance}</p>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     );
