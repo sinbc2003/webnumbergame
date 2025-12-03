@@ -47,6 +47,10 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const pendingIdsRef = useRef<Set<string>>(new Set());
+  const retryRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; attempts: number }>({
+    timeout: null,
+    attempts: 0,
+  });
 
   useEffect(() => {
     if (!user || !token) {
@@ -57,56 +61,99 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
         wsRef.current.close();
         wsRef.current = null;
       }
+      if (retryRef.current.timeout) {
+        clearTimeout(retryRef.current.timeout);
+        retryRef.current.timeout = null;
+      }
       return;
     }
 
-    const wsBase = resolveWsBase();
-    const url = new URL(`${wsBase}/ws/lobby`);
-    url.searchParams.set("token", token);
+    let cancelled = false;
 
-    const socket = new WebSocket(url.toString());
-    wsRef.current = socket;
-
-    socket.onopen = () => setConnected(true);
-    socket.onclose = () => {
-      setConnected(false);
-      wsRef.current = null;
-    };
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload.type === "chat") {
-          if (payload.client_id && pendingIdsRef.current.has(payload.client_id)) {
-            pendingIdsRef.current.delete(payload.client_id);
-            return;
-          }
-          const entry: LobbyMessage = {
-            id: `${payload.timestamp ?? Date.now()}-${payload.user_id ?? Math.random()}`,
-            user: payload.user ?? "Unknown",
-            userId: payload.user_id ?? "unknown",
-            message: payload.message ?? "",
-            timestamp: payload.timestamp ?? new Date().toISOString(),
-            clientId: payload.client_id,
-          };
-          setMessages((prev) => [...prev.slice(-99), entry]);
-        } else if (payload.type === "roster" && Array.isArray(payload.users)) {
-          setRoster(
-            payload.users
-              .filter((item: LobbyUser) => Boolean(item?.user_id && item?.username))
-              .map((item: LobbyUser) => ({
-                user_id: item.user_id,
-                username: item.username,
-              })),
-          );
-        }
-      } catch {
-        // ignore malformed events
+    const scheduleReconnect = () => {
+      if (cancelled) return;
+      if (retryRef.current.timeout) {
+        clearTimeout(retryRef.current.timeout);
+        retryRef.current.timeout = null;
       }
+      const attempts = retryRef.current.attempts + 1;
+      retryRef.current.attempts = attempts;
+      const delay = Math.min(10000, 500 * attempts);
+      retryRef.current.timeout = setTimeout(() => {
+        retryRef.current.timeout = null;
+        connect();
+      }, delay);
     };
+
+    const connect = () => {
+      if (cancelled) return;
+      const wsBase = resolveWsBase();
+      const url = new URL(`${wsBase}/ws/lobby`);
+      url.searchParams.set("token", token);
+
+      const socket = new WebSocket(url.toString());
+      wsRef.current = socket;
+
+      socket.onopen = () => {
+        if (cancelled) return;
+        setConnected(true);
+        retryRef.current.attempts = 0;
+      };
+      socket.onerror = () => {
+        socket.close();
+      };
+      socket.onclose = () => {
+        if (cancelled) return;
+        setConnected(false);
+        wsRef.current = null;
+        scheduleReconnect();
+      };
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === "chat") {
+            if (payload.client_id && pendingIdsRef.current.has(payload.client_id)) {
+              pendingIdsRef.current.delete(payload.client_id);
+              return;
+            }
+            const entry: LobbyMessage = {
+              id: `${payload.timestamp ?? Date.now()}-${payload.user_id ?? Math.random()}`,
+              user: payload.user ?? "Unknown",
+              userId: payload.user_id ?? "unknown",
+              message: payload.message ?? "",
+              timestamp: payload.timestamp ?? new Date().toISOString(),
+              clientId: payload.client_id,
+            };
+            setMessages((prev) => [...prev.slice(-99), entry]);
+          } else if (payload.type === "roster" && Array.isArray(payload.users)) {
+            setRoster(
+              payload.users
+                .filter((item: LobbyUser) => Boolean(item?.user_id && item?.username))
+                .map((item: LobbyUser) => ({
+                  user_id: item.user_id,
+                  username: item.username,
+                })),
+            );
+          }
+        } catch {
+          // ignore malformed events
+        }
+      };
+    };
+
+    connect();
 
     return () => {
-      socket.close();
-      wsRef.current = null;
+      cancelled = true;
+      if (retryRef.current.timeout) {
+        clearTimeout(retryRef.current.timeout);
+        retryRef.current.timeout = null;
+      }
+      retryRef.current.attempts = 0;
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, [token, user]);
 
