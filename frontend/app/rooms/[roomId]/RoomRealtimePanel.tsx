@@ -262,12 +262,12 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         </div>
       )}
 
-      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
+      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5 h-[420px] lg:h-[66vh] flex flex-col">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-white">참여자 {participantItems.length}명</p>
           <span className="text-xs text-night-500">방장/플레이어/관전자</span>
         </div>
-        <div className="mt-4 max-h-[66vh] space-y-2 overflow-y-auto pr-1 text-xs">
+        <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1 text-xs">
           {participantItems.length === 0 && <p className="text-night-500">아직 참가자가 없습니다.</p>}
           {participantItems.map((participant) => (
             <div

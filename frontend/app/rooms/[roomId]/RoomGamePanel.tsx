@@ -1193,14 +1193,14 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             </div>
           </div>
 
-          <div className="flex w-full flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200 lg:max-h-[66vh] lg:overflow-hidden">
+          <div className="flex w-full flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200 h-[420px] lg:h-[66vh] lg:overflow-hidden">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-white">방 채팅</p>
               <span className="text-xs text-night-500">실시간 대화</span>
             </div>
             <div
               ref={chatBodyRef}
-              className="mt-3 flex-1 min-h-[180px] space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
+              className="mt-3 flex-1 space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
             >
               {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
               {chatMessages.map((message) => (
