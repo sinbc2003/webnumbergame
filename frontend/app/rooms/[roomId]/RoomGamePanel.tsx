@@ -781,7 +781,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     "relative space-y-6 rounded-[30px] border border-night-800/80 bg-[rgba(5,10,20,0.85)] p-6 text-night-100 shadow-[0_25px_70px_rgba(0,0,0,0.6)]";
 
   const containerClass = isPlayerView
-    ? "fixed inset-0 z-40 flex flex-col bg-[#050a15] px-4 py-6 text-white"
+    ? "fixed inset-0 z-40 mx-auto flex w-full max-w-6xl flex-col bg-[#050a15] px-3 py-4 text-white sm:px-5 sm:py-5"
     : hasActiveMatch
       ? "fixed inset-0 z-40 overflow-y-auto bg-[#050a15]/95 p-6 space-y-4"
       : lobbyShellClass;

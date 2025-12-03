@@ -606,6 +606,28 @@ body {
   filter: blur(4px) brightness(0.6);
 }
 
+body.focus-shell-compact {
+  background: #050a15;
+}
+
+body.focus-shell-compact .focus-shell {
+  padding: 0;
+  min-height: 100vh;
+  gap: 0;
+}
+
+body.focus-shell-compact .focus-shell__header {
+  display: none;
+}
+
+body.focus-shell-compact .focus-shell__content {
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .leaderboard-full {
   height: calc(100vh - 200px);
   overflow-y: auto;
