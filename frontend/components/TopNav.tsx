@@ -35,6 +35,7 @@ interface Props {
   showChat?: boolean;
   layout?: LayoutMode;
   hideFocusHeader?: boolean;
+  compactFocusPadding?: boolean;
 }
 
 const formatTime = (value: string) => {
@@ -52,6 +53,7 @@ export default function MathNetworkShell({
   showChat = true,
   layout = "lobby",
   hideFocusHeader = false,
+  compactFocusPadding = false,
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -187,7 +189,14 @@ export default function MathNetworkShell({
   if (isFocus) {
     return (
       <ShellTransitionProvider value={runTransition}>
-        <div className={clsx("focus-shell", transitioning && "focus-shell--exit", hideFocusHeader && "focus-shell--plain")}>
+        <div
+          className={clsx(
+            "focus-shell",
+            transitioning && "focus-shell--exit",
+            hideFocusHeader && "focus-shell--plain",
+            compactFocusPadding && "focus-shell--tight",
+          )}
+        >
           {!hideFocusHeader && (
             <header className="focus-shell__header">
               <div>

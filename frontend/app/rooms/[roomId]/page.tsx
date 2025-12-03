@@ -32,7 +32,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
 
   if (!room) {
     return (
-      <TopNav layout="focus" pageTitle="Channel Offline" description="선택한 방을 찾을 수 없습니다." showChat={false}>
+      <TopNav layout="focus" pageTitle="Channel Offline" description="선택한 방을 찾을 수 없습니다." showChat={false} compactFocusPadding>
         <main className="mx-auto max-w-xl py-10 text-center text-white">
           <p>방을 찾을 수 없습니다.</p>
           <Link href="/rooms" className="text-indigo-300 underline">
@@ -44,8 +44,8 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
   }
 
   return (
-    <TopNav layout="focus" showChat={false} hideFocusHeader>
-      <main className="mx-auto max-w-6xl pb-6 pt-3 sm:pt-4">
+    <TopNav layout="focus" showChat={false} hideFocusHeader compactFocusPadding>
+      <main className="mx-auto max-w-6xl pb-5 pt-1 sm:pt-2">
         <RoomPageShell room={room} participants={participants} />
       </main>
     </TopNav>
