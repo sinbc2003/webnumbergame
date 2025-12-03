@@ -11,6 +11,7 @@ import { getRuntimeConfig } from "@/lib/runtimeConfig";
 import type { ActiveMatch, Participant, RoundType, Room } from "@/types/api";
 
 type BoardSlot = "playerOne" | "playerTwo";
+type PlayerAssignmentSlot = "player_one" | "player_two";
 
 type RoomEventPayload = {
   type?: string;
@@ -170,12 +171,17 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null);
   const [preCountdown, setPreCountdown] = useState<number | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [assigningSlot, setAssigningSlot] = useState<PlayerAssignmentSlot | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const userInteractedRef = useRef(false);
   const tickRef = useRef<number | null>(null);
   const [initialRemaining, setInitialRemaining] = useState<number | null>(null);
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+  const [slotSelections, setSlotSelections] = useState<{ player_one: string; player_two: string }>({
+    player_one: room.player_one_id ?? "",
+    player_two: room.player_two_id ?? "",
+  });
 
   const playerIdsRef = useRef<{ playerOne: string | undefined; playerTwo: string | undefined }>({
     playerOne: initialPlayerOne,
@@ -193,6 +199,13 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerIdsRef.current.playerTwo = next;
     setPlayerTwo(next);
   }, [room.player_two_id]);
+
+  useEffect(() => {
+    setSlotSelections({
+      player_one: playerOne ?? "",
+      player_two: playerTwo ?? "",
+    });
+  }, [playerOne, playerTwo]);
 
   useEffect(() => {
     setParticipantState(participants);
@@ -221,6 +234,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const hasActiveMatch = Boolean(activeMatch);
 
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
+  const isHost = user?.id === room.host_id;
 
   useEffect(() => {
     if (!data?.match_id) {
@@ -346,79 +360,42 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   );
 
   const roundLabel = roundType === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
+  const participantQueue = useMemo(() => {
+    return participantState
+      .map((participant, index) => ({ participant, index }))
+      .sort((a, b) => {
+        const orderA = a.participant.order_index ?? Number.POSITIVE_INFINITY;
+        const orderB = b.participant.order_index ?? Number.POSITIVE_INFINITY;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.index - b.index;
+      })
+      .map((entry) => entry.participant);
+  }, [participantState]);
 
-  const slotSubtitle = useCallback(
-    (participant?: Participant) => {
-      if (!participant) return "연결 대기";
-      if (participant.user_id === room.host_id) return "방장";
-      if (participant.user_id === playerOne) return "플레이어 1";
-      if (participant.user_id === playerTwo) return "플레이어 2";
-      return participant.role === "player" ? "지정 플레이어" : "관전자";
-    },
-    [playerOne, playerTwo, room.host_id],
+  const spectatorQueue = useMemo(
+    () => participantQueue.filter((participant) => participant.role !== "player"),
+    [participantQueue],
   );
 
-  const friendlyRoster = useMemo(() => {
-    const picked: Participant[] = [];
-    const pushUnique = (participant?: Participant) => {
-      if (!participant) return;
-      if (picked.some((item) => item.user_id === participant.user_id)) return;
-      picked.push(participant);
-    };
-    pushUnique(participantState.find((p) => p.user_id === room.host_id));
-    pushUnique(participantState.find((p) => p.user_id === playerOne));
-    pushUnique(participantState.find((p) => p.user_id === playerTwo));
-    participantState
-      .filter((p) => p.role === "player")
-      .forEach((player) => pushUnique(player));
-    return picked;
-  }, [participantState, room.host_id, playerOne, playerTwo]);
-
-  const enemyRoster = useMemo(
+  const participantOptions = useMemo(
     () =>
-      participantState.filter(
-        (p) => p.role !== "player" && p.user_id !== room.host_id,
+      [{ label: "비워두기", value: "" }].concat(
+        participantQueue.map((participant) => ({
+          label: participant.username ?? (participant.user_id ? `참가자 ${participant.user_id.slice(0, 6)}…` : "이름 없음"),
+          value: participant.user_id,
+        })),
       ),
-    [participantState, room.host_id],
+    [participantQueue],
   );
 
-  const createSlotEntries = useCallback(
-    (roster: Participant[], type: "friendly" | "enemy"): LobbySlotEntry[] => {
-      const accent: LobbySlotEntry["accent"] = type === "friendly" ? "emerald" : "red";
-      const slots = roster.slice(0, 6).map((participant, index) => ({
-        key: participant.id,
-        label: participantLabel(participant.user_id),
-        subtitle: slotSubtitle(participant),
-        ready: participant.is_ready,
-        isHost: participant.user_id === room.host_id,
-        empty: false,
-        accent,
-        power: Math.min(100, ((participant.score ?? 0) % 70) + 25 + index * 3),
-      }));
-      while (slots.length < 6) {
-        slots.push({
-          key: `${type}-empty-${slots.length}`,
-          label: type === "friendly" ? "플레이어 슬롯 비어 있음" : "관전자 대기 슬롯",
-          subtitle: "연결 대기",
-          ready: false,
-          isHost: false,
-          empty: true,
-          accent,
-          power: 12,
-        });
-      }
-      return slots;
+  const playerQueuePreview = useMemo(() => participantQueue.slice(0, 4), [participantQueue]);
+  const participantOrder = useCallback(
+    (userId?: string | null) => {
+      if (!userId) return null;
+      const index = participantQueue.findIndex((participant) => participant.user_id === userId);
+      return index === -1 ? null : index + 1;
     },
-    [participantLabel, room.host_id, slotSubtitle],
-  );
-
-  const friendlySlots = useMemo(
-    () => createSlotEntries(friendlyRoster, "friendly"),
-    [createSlotEntries, friendlyRoster],
-  );
-  const enemySlots = useMemo(
-    () => createSlotEntries(enemyRoster, "enemy"),
-    [createSlotEntries, enemyRoster],
+    [participantQueue],
   );
 
   const handleLeaveRoom = useCallback(async () => {
@@ -462,6 +439,35 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     >
       {leaving ? "나가는 중..." : "방 나가기"}
     </button>
+  );
+
+  const handleAssignSlot = useCallback(
+    async (slot: PlayerAssignmentSlot, userId: string) => {
+      if (!isHost) return;
+      setAssigningSlot(slot);
+      setStatusError(null);
+      setSlotSelections((prev) => ({
+        ...prev,
+        [slot]: userId,
+      }));
+      try {
+        await api.post(`/rooms/${roomId}/players`, {
+          slot,
+          user_id: userId || null,
+        });
+        setStatusMessage("플레이어 구성을 업데이트했습니다.");
+        mutate();
+      } catch (err: any) {
+        setStatusError(err?.response?.data?.detail ?? "플레이어 지정에 실패했습니다.");
+        setSlotSelections({
+          player_one: playerOne ?? "",
+          player_two: playerTwo ?? "",
+        });
+      } finally {
+        setAssigningSlot(null);
+      }
+    },
+    [isHost, mutate, playerOne, playerTwo, roomId],
   );
 
   useEffect(() => {
@@ -932,12 +938,105 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
         </div>
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[3fr,2fr]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[2.5fr,1.5fr]">
           <div className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <LobbySlotColumn title="Sunken Warriors" accent="emerald" slots={friendlySlots} />
-              <LobbySlotColumn title="Enemies" accent="red" slots={enemySlots} />
+            <div className="rounded-2xl border border-night-800/70 bg-night-950/30 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">플레이어 슬롯</p>
+                  <p className="text-2xl font-semibold text-white">입장 순으로 자동 배치</p>
+                </div>
+                <span className="rounded-full border border-indigo-500/50 px-3 py-1 text-[11px] tracking-[0.35em] text-indigo-200">
+                  {isHost ? "HOST CONTROL" : "관전자 모드"}
+                </span>
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                {(["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => {
+                  const boardSlot: BoardSlot = slot === "player_one" ? "playerOne" : "playerTwo";
+                  const assignedUser = boardSlot === "playerOne" ? playerOne : playerTwo;
+                  const assignedParticipant = participantState.find((participant) => participant.user_id === assignedUser);
+                  const order = participantOrder(assignedUser);
+                  return (
+                    <div key={slot} className="rounded-2xl border border-night-800/70 bg-night-950/60 p-4 text-sm text-night-200">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">
+                            {slot === "player_one" ? "SLOT A" : "SLOT B"}
+                          </p>
+                          <p className="text-xl font-semibold text-white">{participantLabel(assignedUser)}</p>
+                        </div>
+                        {assignedParticipant?.is_ready && (
+                          <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[11px] text-night-500">
+                        {order ? `입장 #${order}` : "아직 지정되지 않았습니다."}
+                      </p>
+                      {isHost ? (
+                        <select
+                          value={slotSelections[slot]}
+                          disabled={assigningSlot === slot}
+                          onChange={(event) => handleAssignSlot(slot, event.target.value)}
+                          className="mt-3 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+                        >
+                          {participantOptions.map((option) => (
+                            <option key={`${slot}-${option.value || "empty"}`} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="mt-3 rounded-lg border border-night-800/60 bg-night-900/50 px-3 py-2 text-xs text-night-400">
+                          방장이 순서를 조정할 수 있습니다.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-5 rounded-xl border border-night-800/60 bg-night-900/40 p-3">
+                <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">입장 대기열</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {playerQueuePreview.length === 0 && <span className="text-xs text-night-500">아직 입장한 사용자가 없습니다.</span>}
+                  {playerQueuePreview.map((participant) => (
+                    <span
+                      key={`queue-${participant.id}`}
+                      className="inline-flex items-center gap-1 rounded-full border border-night-700 px-3 py-1 text-xs text-night-200"
+                    >
+                      <span className="text-[10px] text-night-500">#{participantOrder(participant.user_id) ?? "-"}</span>
+                      {participant.username ?? participant.user_id.slice(0, 6)}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            <div className="rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-white">관전자 슬롯</p>
+                <span className="text-xs text-night-500">{spectatorQueue.length}명</span>
+              </div>
+              <div className="mt-4 grid max-h-[360px] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+                {spectatorQueue.length === 0 && (
+                  <p className="rounded-xl border border-night-800/60 bg-night-950/40 p-3 text-xs text-night-500">관전자가 없습니다.</p>
+                )}
+                {spectatorQueue.map((spectator) => (
+                  <div
+                    key={`spectator-${spectator.id}`}
+                    className="rounded-xl border border-night-800/70 bg-night-950/50 p-3 text-xs text-night-300"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-white">{spectator.username ?? spectator.user_id.slice(0, 6)}</p>
+                      <span className="text-[10px] text-night-500">#{participantOrder(spectator.user_id) ?? "-"}</span>
+                    </div>
+                    <p className="text-[11px] text-night-500">
+                      {spectator.user_id === room.host_id ? "방장" : spectator.role === "player" ? "플레이어" : "관전자"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-xs text-night-300">
               <div className="grid gap-3 text-sm text-night-300 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
@@ -1508,63 +1607,6 @@ function PlayerPanel({
             </div>
           ))}
         </div>
-      </div>
-    </div>
-  );
-}
-
-interface LobbySlotEntry {
-  key: string;
-  label: string;
-  subtitle: string;
-  ready?: boolean;
-  isHost?: boolean;
-  empty?: boolean;
-  accent: "emerald" | "red";
-  power: number;
-}
-
-interface LobbySlotColumnProps {
-  title: string;
-  accent: "emerald" | "red";
-  slots: LobbySlotEntry[];
-}
-
-function LobbySlotColumn({ title, accent, slots }: LobbySlotColumnProps) {
-  const accentText = accent === "emerald" ? "text-emerald-300" : "text-red-300";
-  const barColor = accent === "emerald" ? "bg-emerald-400" : "bg-red-400";
-  const readyBadge =
-    accent === "emerald" ? "border-emerald-400/70 text-emerald-200" : "border-red-400/70 text-red-200";
-  const idleBadge =
-    accent === "emerald" ? "border-emerald-800/60 text-emerald-300/70" : "border-red-800/60 text-red-200/70";
-  return (
-    <div className="rounded-2xl border border-night-800/80 bg-night-900/40 p-3 sm:p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <span className={`text-[10px] tracking-[0.35em] ${accentText}`}>READY</span>
-      </div>
-      <div className="space-y-2">
-        {slots.map((slot) => (
-          <div
-            key={slot.key}
-            className={`rounded-xl border border-night-800/70 bg-night-950/40 px-3 py-2 text-sm ${
-              slot.empty ? "opacity-50" : ""
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <p className="font-semibold text-white">{slot.label}</p>
-              {!slot.empty && (
-                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${slot.ready ? readyBadge : idleBadge}`}>
-                  {slot.ready ? "READY" : "WAIT"}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-night-500">{slot.subtitle}</p>
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-night-950/70">
-              <div className={`${barColor} h-full`} style={{ width: `${slot.power}%` }} />
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
