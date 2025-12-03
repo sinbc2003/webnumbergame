@@ -616,8 +616,12 @@ def _build_active_match_response(match) -> ActiveMatchResponse:
 
 @router.get("/{room_id}/active-match", response_model=ActiveMatchResponse | None)
 async def get_active_match(room_id: str, session: AsyncSession = Depends(get_session)):
+    room = await _get_room_or_404(session, room_id)
     service = GameService(session)
     match = await service.get_active_match(room_id)
+    if match:
+        await _maybe_finish_expired_match(session, service, room, match)
+        match = await service.get_active_match(room_id)
     if not match:
         return None
     return _build_active_match_response(match)

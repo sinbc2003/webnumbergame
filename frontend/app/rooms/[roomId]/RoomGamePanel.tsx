@@ -224,6 +224,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const [chatInput, setChatInput] = useState("");
   const [chatSending, setChatSending] = useState(false);
   const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
+  const [scoreboard, setScoreboard] = useState<{ playerOne: number; playerTwo: number }>({
+    playerOne: 0,
+    playerTwo: 0,
+  });
+  const [lastWinnerLabel, setLastWinnerLabel] = useState<string | null>(null);
+  const [lastWinReason, setLastWinReason] = useState<string | null>(null);
 
   const playerIdsRef = useRef<{ playerOne: string | undefined; playerTwo: string | undefined }>({
     playerOne: initialPlayerOne,
@@ -407,6 +413,37 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     },
     [participantState],
   );
+
+  const renderScoreboardPanel = (className = "") => {
+    const slotALabel = participantLabel(playerOne);
+    const slotBLabel = participantLabel(playerTwo);
+    return (
+      <div className={`rounded-2xl border border-night-800/70 bg-night-950/30 p-4 text-night-200 ${className}`}>
+        <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">SCORE BOARD</p>
+        <div className="mt-3 grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-night-500">Slot A</p>
+            <p className="text-lg font-semibold text-white">{slotALabel}</p>
+            <p className="mt-1 text-3xl font-black text-emerald-300">{scoreboard.playerOne}</p>
+          </div>
+          <div className="flex flex-col items-center justify-center">
+            <span className="text-sm text-night-500">vs</span>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-night-500">Slot B</p>
+            <p className="text-lg font-semibold text-white">{slotBLabel}</p>
+            <p className="mt-1 text-3xl font-black text-indigo-300">{scoreboard.playerTwo}</p>
+          </div>
+        </div>
+        {lastWinnerLabel && (
+          <p className="mt-3 text-xs text-night-400">
+            최근 승자: <span className="font-semibold text-white">{lastWinnerLabel}</span>
+            {lastWinReason ? ` · ${lastWinReason}` : ""}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   const roundLabel = describeRoomMode({ mode: room.mode, team_size: teamSize });
   const participantQueue = useMemo(() => {
@@ -667,6 +704,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               playerOne: createBoardState(),
               playerTwo: createBoardState(),
             });
+            setScoreboard({ playerOne: 0, playerTwo: 0 });
+            setLastWinnerLabel(null);
+            setLastWinReason(null);
             setStatusMessage("새 라운드가 시작되었습니다. 카운트다운 후 입력이 열립니다.");
             setStatusError(null);
             setRoundOutcome(null);
@@ -701,6 +741,15 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             });
             if (winnerId) {
               const winnerLabel = participantLabel(winnerId);
+              setLastWinnerLabel(winnerLabel);
+              const reasonLabel =
+                reason === "timeout" ? "시간 종료 판정" : reason === "forfeit" ? "기권승" : "정답 제출";
+              setLastWinReason(reasonLabel);
+              if (winnerId === playerIdsRef.current.playerOne) {
+                setScoreboard((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
+              } else if (winnerId === playerIdsRef.current.playerTwo) {
+                setScoreboard((prev) => ({ ...prev, playerTwo: prev.playerTwo + 1 }));
+              }
               if (winnerId === user?.id) {
                 const message =
                   reason === "timeout"
@@ -981,6 +1030,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               </div>
             </div>
           </div>
+          {renderScoreboardPanel()}
 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <div className="space-y-1 text-emerald-300">
@@ -1084,6 +1134,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
         <div className={`mt-6 grid gap-6 ${roundOutcome ? "lg:grid-cols-[3fr,1.5fr]" : ""}`}>
           <div className="space-y-4">
+            {renderScoreboardPanel()}
             <div className="rounded-2xl border border-night-800/70 bg-night-950/30 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -1294,6 +1345,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </p>
         </div>
       </div>
+      {renderScoreboardPanel()}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {visibleSlots.map((slot) => {
