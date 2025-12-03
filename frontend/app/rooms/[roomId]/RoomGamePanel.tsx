@@ -983,7 +983,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       })
     : [];
   const lobbyShellClass =
-    "relative space-y-6 rounded-[30px] border border-night-800/80 bg-[rgba(5,10,20,0.85)] p-6 text-night-100 shadow-[0_25px_70px_rgba(0,0,0,0.6)]";
+    "relative flex h-[66vh] min-h-[520px] max-h-[85vh] flex-col gap-4 overflow-hidden rounded-[30px] border border-night-800/80 bg-[rgba(5,10,20,0.85)] p-5 text-night-100 shadow-[0_25px_70px_rgba(0,0,0,0.6)]";
 
   const containerClass = isPlayerView
     ? "fixed inset-0 z-40 mx-auto flex w-full max-w-6xl flex-col bg-[#050a15] px-3 py-4 text-white sm:px-5 sm:py-5"
@@ -1136,127 +1136,122 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
         </div>
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
-        <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)]">
-          <div className="space-y-4">
-            {renderScoreboardPanel()}
-            <div className="rounded-2xl border border-night-800/70 bg-night-950/30 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">플레이어 슬롯</p>
-                  <p className="text-2xl font-semibold text-white">Slot A / Slot B</p>
-                </div>
-                <span className="rounded-full border border-indigo-500/50 px-3 py-1 text-[11px] tracking-[0.35em] text-indigo-200">
-                  {isHost ? "HOST CONTROL" : "관전자 모드"}
-                </span>
+        <div className="mt-3 flex flex-1 flex-col gap-4 overflow-hidden">
+          {renderScoreboardPanel("w-full")}
+          <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">플레이어 슬롯</p>
+                <p className="text-2xl font-semibold text-white">Slot A / Slot B</p>
               </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {(["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => {
-                  const boardSlot: BoardSlot = slot === "player_one" ? "playerOne" : "playerTwo";
-                  const assignedUser = boardSlot === "playerOne" ? playerOne : playerTwo;
-                  const assignedParticipant = participantState.find((participant) => participant.user_id === assignedUser);
-                  const order = participantOrder(assignedUser);
-                  return (
-                    <div key={slot} className="rounded-2xl border border-night-800/70 bg-night-950/60 p-4 text-sm text-night-200">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">
-                            {slot === "player_one" ? "SLOT A" : "SLOT B"}
-                          </p>
-                          <p className="text-xl font-semibold text-white">{participantLabel(assignedUser)}</p>
-                        </div>
-                        {assignedParticipant?.is_ready && (
-                          <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
-                        )}
-                      </div>
-                      <p className="mt-1 text-[11px] text-night-500">
-                        {order ? `입장 #${order}` : "아직 지정되지 않았습니다."}
-                      </p>
-                      {isHost ? (
-                        <select
-                          value={slotSelections[slot]}
-                          disabled={assigningSlot === slot}
-                          onChange={(event) => handleAssignSlot(slot, event.target.value)}
-                          className="mt-3 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
-                        >
-                          {participantOptions.map((option) => (
-                            <option key={`${slot}-${option.value || "empty"}`} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <p className="mt-3 rounded-lg border border-night-800/60 bg-night-900/50 px-3 py-2 text-xs text-night-400">
-                          방장이 순서를 조정할 수 있습니다.
+              <span className="rounded-full border border-indigo-500/50 px-3 py-1 text-[11px] tracking-[0.35em] text-indigo-200">
+                {isHost ? "HOST CONTROL" : "관전자 모드"}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {(["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => {
+                const boardSlot: BoardSlot = slot === "player_one" ? "playerOne" : "playerTwo";
+                const assignedUser = boardSlot === "playerOne" ? playerOne : playerTwo;
+                const assignedParticipant = participantState.find((participant) => participant.user_id === assignedUser);
+                const order = participantOrder(assignedUser);
+                return (
+                  <div key={slot} className="rounded-2xl border border-night-800/70 bg-night-950/60 p-4 text-sm text-night-200">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">
+                          {slot === "player_one" ? "SLOT A" : "SLOT B"}
                         </p>
+                        <p className="text-xl font-semibold text-white">{participantLabel(assignedUser)}</p>
+                      </div>
+                      {assignedParticipant?.is_ready && (
+                        <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-          <div className="flex min-h-[420px] flex-col gap-4">
-            <div className="flex flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-white">방 채팅</p>
-                <span className="text-xs text-night-500">실시간 대화</span>
-              </div>
-              <div
-                ref={chatBodyRef}
-                className="mt-3 flex-1 min-h-[220px] space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
-              >
-                {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
-                {chatMessages.map((message) => (
-                  <div key={message.id} className="space-y-1 rounded-xl border border-night-800/60 bg-night-900/40 p-2">
-                    <div className="flex items-center justify-between text-[11px] text-night-500">
-                      <span className="font-semibold text-white">{message.username}</span>
-                      <span>{formatChatTime(message.timestamp)}</span>
-                    </div>
-                    <p className="whitespace-pre-wrap break-words text-night-100">{message.message}</p>
+                    <p className="mt-1 text-[11px] text-night-500">{order ? `입장 #${order}` : "아직 지정되지 않았습니다."}</p>
+                    {isHost ? (
+                      <select
+                        value={slotSelections[slot]}
+                        disabled={assigningSlot === slot}
+                        onChange={(event) => handleAssignSlot(slot, event.target.value)}
+                        className="mt-3 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+                      >
+                        {participantOptions.map((option) => (
+                          <option key={`${slot}-${option.value || "empty"}`} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="mt-3 rounded-lg border border-night-800/60 bg-night-900/50 px-3 py-2 text-xs text-night-400">
+                        방장이 순서를 조정할 수 있습니다.
+                      </p>
+                    )}
                   </div>
-                ))}
-              </div>
-              {chatErrorMessage && <p className="mt-2 text-xs text-red-400">{chatErrorMessage}</p>}
-              {canSendChat ? (
-                <form onSubmit={handleSendChat} className="mt-3 flex gap-2">
-                  <input
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    maxLength={500}
-                    placeholder="메시지를 입력하세요"
-                    className="flex-1 rounded-xl border border-night-800 bg-night-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={chatSending || !chatInput.trim()}
-                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
-                  >
-                    {chatSending ? "전송 중..." : "전송"}
-                  </button>
-                </form>
-              ) : (
-                <p className="mt-3 text-xs text-night-500">로그인 후 대화에 참여할 수 있습니다.</p>
-              )}
+                );
+              })}
             </div>
-            {roundOutcome && (
-              <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
-                <p className="font-semibold">
-                  {roundOutcome.reason === "timeout"
-                    ? "시간 종료 결과"
-                    : roundOutcome.reason === "forfeit"
-                      ? "기권 처리"
-                      : "직전 라운드 결과"}
-                </p>
-                <p className="mt-1">
-                  승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
-                </p>
-                {typeof roundOutcome.distance === "number" && (
-                  <p className="text-xs text-amber-200/70">목표와의 차이 {roundOutcome.distance}</p>
-                )}
-              </div>
+          </div>
+
+          <div className="flex w-full flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200 lg:max-h-[66vh] lg:overflow-hidden">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">방 채팅</p>
+              <span className="text-xs text-night-500">실시간 대화</span>
+            </div>
+            <div
+              ref={chatBodyRef}
+              className="mt-3 flex-1 min-h-[200px] space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
+            >
+              {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
+              {chatMessages.map((message) => (
+                <div key={message.id} className="space-y-1 rounded-xl border border-night-800/60 bg-night-900/40 p-2">
+                  <div className="flex items-center justify-between text-[11px] text-night-500">
+                    <span className="font-semibold text-white">{message.username}</span>
+                    <span>{formatChatTime(message.timestamp)}</span>
+                  </div>
+                  <p className="whitespace-pre-wrap break-words text-night-100">{message.message}</p>
+                </div>
+              ))}
+            </div>
+            {chatErrorMessage && <p className="mt-2 text-xs text-red-400">{chatErrorMessage}</p>}
+            {canSendChat ? (
+              <form onSubmit={handleSendChat} className="mt-3 flex gap-2">
+                <input
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  maxLength={500}
+                  placeholder="메시지를 입력하세요"
+                  className="flex-1 rounded-xl border border-night-800 bg-night-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={chatSending || !chatInput.trim()}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
+                >
+                  {chatSending ? "전송 중..." : "전송"}
+                </button>
+              </form>
+            ) : (
+              <p className="mt-3 text-xs text-night-500">로그인 후 대화에 참여할 수 있습니다.</p>
             )}
           </div>
-        </div>
+
+          {roundOutcome && (
+            <div className="w-full rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <p className="font-semibold">
+                {roundOutcome.reason === "timeout"
+                  ? "시간 종료 결과"
+                  : roundOutcome.reason === "forfeit"
+                    ? "기권 처리"
+                    : "직전 라운드 결과"}
+              </p>
+              <p className="mt-1">
+                승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
+              </p>
+              {typeof roundOutcome.distance === "number" && (
+                <p className="text-xs text-amber-200/70">목표와의 차이 {roundOutcome.distance}</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
