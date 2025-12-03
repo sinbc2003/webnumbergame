@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-import RoomRealtimePanel from "./RoomRealtimePanel";
-import RoomGamePanel from "./RoomGamePanel";
+import RoomPageShell from "./RoomPageShell";
 import TopNav from "@/components/TopNav";
 import type { Participant, Room } from "@/types/api";
 
@@ -54,14 +53,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
       showChat={false}
     >
       <main className="mx-auto max-w-6xl py-6">
-        <div className="grid gap-6 lg:grid-cols-[2.2fr,1fr]">
-          <section>
-            <RoomGamePanel room={room} participants={participants} />
-          </section>
-          <section>
-            <RoomRealtimePanel room={room} participants={participants} />
-          </section>
-        </div>
+        <RoomPageShell room={room} participants={participants} />
       </main>
     </TopNav>
   );

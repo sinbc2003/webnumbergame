@@ -131,6 +131,7 @@ const createDefaultTeamMembers = (): TeamMemberState[] =>
 interface Props {
   room: Room;
   participants: Participant[];
+  onPlayerFocusChange?: (isFocused: boolean) => void;
 }
 
 const resolveWsBase = () => {
@@ -142,7 +143,7 @@ const resolveWsBase = () => {
 
 const createBoardState = (): BoardState => ({ expression: "", history: [] });
 
-export default function RoomGamePanel({ room, participants }: Props) {
+export default function RoomGamePanel({ room, participants, onPlayerFocusChange }: Props) {
   const roomId = room.id;
   const roundType: RoundType = room.round_type;
   const initialPlayerOne = room.player_one_id ?? undefined;
@@ -215,6 +216,9 @@ export default function RoomGamePanel({ room, participants }: Props) {
     refreshInterval: 15000,
     revalidateOnFocus: true,
   });
+
+  const activeMatch = data ?? null;
+  const hasActiveMatch = Boolean(activeMatch);
 
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
 
@@ -687,12 +691,16 @@ export default function RoomGamePanel({ room, participants }: Props) {
     return () => clearInterval(interval);
   }, [data?.deadline, parseDeadline]);
 
-  const mySlot: BoardSlot | null =
-    user?.id && user.id === playerIdsRef.current.playerOne
-      ? "playerOne"
-      : user?.id === playerIdsRef.current.playerTwo
-        ? "playerTwo"
-        : null;
+  const mySlot: BoardSlot | null = useMemo(() => {
+    if (!user?.id) return null;
+    if (playerOne && user.id === playerOne) return "playerOne";
+    if (playerTwo && user.id === playerTwo) return "playerTwo";
+    return null;
+  }, [user?.id, playerOne, playerTwo]);
+
+  useEffect(() => {
+    onPlayerFocusChange?.(hasActiveMatch && Boolean(mySlot));
+  }, [hasActiveMatch, mySlot, onPlayerFocusChange]);
 
   useEffect(() => {
     if (!pendingInput || pendingInput.slot !== mySlot) return;
@@ -747,8 +755,6 @@ export default function RoomGamePanel({ room, participants }: Props) {
     return `${minutes}:${seconds}`;
   };
 
-  const activeMatch = data ?? null;
-  const hasActiveMatch = Boolean(activeMatch);
   const isPlayerView = hasActiveMatch && Boolean(mySlot);
   const visibleSlots: BoardSlot[] = isPlayerView && mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[]);
   const myBoard = mySlot ? boards[mySlot] : null;
