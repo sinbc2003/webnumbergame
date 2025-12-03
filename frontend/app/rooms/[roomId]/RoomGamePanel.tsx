@@ -1067,17 +1067,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             </div>
           </div>
           <div className="space-y-4">
-            <div className="rounded-2xl border border-night-800/70 bg-night-950/30 p-4 text-sm">
-              <p className="text-xs uppercase tracking-[0.35em] text-night-500">상태 콘솔</p>
-              <div className="mt-3 space-y-2 text-night-200">
-                {statusMessage ? (
-                  <p className="text-emerald-300">• {statusMessage}</p>
-                ) : (
-                  <p className="text-night-500">방장이 라운드를 시작하면 스타크래프트식 카운트다운이 표시됩니다.</p>
-                )}
-                {statusError && <p className="text-red-300">• {statusError}</p>}
-              </div>
-            </div>
             {roundOutcome && (
               <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
                 <p className="font-semibold">
@@ -1095,14 +1084,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 )}
               </div>
             )}
-            <div className="rounded-2xl border border-night-800/80 bg-night-950/30 p-4 text-xs text-night-400">
-              <p className="font-semibold text-night-100">라운드 개시 안내</p>
-              <p className="mt-2">
-                방장이 <span className="text-emerald-300">라운드 시작</span>을 누르면 5 → 0 카운트다운이 표시되고,
-                0이 되면 즉시 전장 화면으로 전환됩니다.
-              </p>
-              <p className="mt-2">카운트다운 동안 플레이어는 식 입력창이 잠긴 상태로 준비 시간을 가집니다.</p>
-            </div>
           </div>
         </div>
       </div>
