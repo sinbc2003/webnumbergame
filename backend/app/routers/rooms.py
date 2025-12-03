@@ -516,11 +516,7 @@ async def submit_expression(
     if not match:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="진행 중인 라운드가 없습니다.")
 
-    team_label = (
-        payload.team_label
-        if room.round_type in {RoundType.TEAM_2V2, RoundType.TEAM_4V4}
-        else None
-    )
+    team_label = payload.team_label if room.round_type == RoundType.ROUND2_TEAM else None
     submission = await game_service.submit_expression(
         match=match,
         user=current_user,

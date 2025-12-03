@@ -17,7 +17,7 @@ class Room(SQLModel, table=True):
     host_id: str = Field(foreign_key="users.id")
     status: RoomStatus = Field(default=RoomStatus.WAITING)
     current_round: int = Field(default=1)
-    round_type: RoundType = Field(default=RoundType.SOLO_1V1)
+    round_type: RoundType = Field(default=RoundType.ROUND1_INDIVIDUAL)
     tournament_id: Optional[str] = Field(default=None, foreign_key="tournaments.id")
     expires_at: Optional[datetime] = Field(default=None)
     max_players: int = Field(default=16)

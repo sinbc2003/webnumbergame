@@ -27,16 +27,6 @@ async function fetchParticipants(roomId: string): Promise<Participant[]> {
   }
 }
 
-const roundLabelMap: Record<string, string> = {
-  solo_1v1: "1라운드 개인전",
-  relay_2v2: "2vs2 릴레이",
-  relay_3v3: "3vs3 릴레이",
-  relay_4v4: "4vs4 릴레이",
-  team_2v2: "2vs2 팀전",
-  team_4v4: "4vs4 팀전",
-  tournament_1v1: "토너먼트 개인전",
-};
-
 export default async function RoomDetailPage({ params }: { params: { roomId: string } }) {
   const room = await fetchRoom(params.roomId);
   const participants = room ? await fetchParticipants(room.id) : [];
@@ -54,7 +44,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
     );
   }
 
-  const roundLabel = roundLabelMap[room.round_type] ?? "커스텀 모드";
+  const roundLabel = room.round_type === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
 
   return (
     <TopNav
