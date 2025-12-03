@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
@@ -22,6 +23,8 @@ from ..schemas.room import (
     ActiveMatchProblem,
     PlayerAssignmentRequest,
     InputUpdateRequest,
+    ChatMessageRequest,
+    ChatMessageResponse,
 )
 from ..services.game_service import GameService
 from ..services.room_service import RoomService
@@ -330,6 +333,40 @@ async def update_player_input(
             "expression": payload.expression,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
+    )
+
+
+@router.post("/{room_id}/chat", response_model=ChatMessageResponse)
+async def send_room_chat(
+    room_id: str,
+    payload: ChatMessageRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    room = await _get_room_or_404(session, room_id)
+    message = (payload.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="메시지를 입력해 주세요.")
+    sanitized = message[:500]
+    timestamp = datetime.utcnow()
+    message_id = str(uuid4())
+    event = {
+        "type": "chat_message",
+        "room_id": room.id,
+        "message_id": message_id,
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "message": sanitized,
+        "timestamp": timestamp.isoformat(),
+    }
+    await manager.broadcast_room(room.id, event)
+    return ChatMessageResponse(
+        message_id=message_id,
+        room_id=room.id,
+        user_id=current_user.id,
+        username=current_user.username,
+        message=sanitized,
+        timestamp=timestamp,
     )
 
 

@@ -90,6 +90,10 @@ class InputUpdateRequest(BaseModel):
     expression: str = Field(default="", max_length=256)
 
 
+class ChatMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=500)
+
+
 class TeamMemberInput(BaseModel):
     user_id: str
     allocated_budget: int
@@ -120,4 +124,13 @@ class ActiveMatchResponse(BaseModel):
     problems: List[ActiveMatchProblem]
     player_one_id: str | None
     player_two_id: str | None
+
+
+class ChatMessageResponse(BaseModel):
+    message_id: str
+    room_id: str
+    user_id: str
+    username: str
+    message: str
+    timestamp: datetime
 

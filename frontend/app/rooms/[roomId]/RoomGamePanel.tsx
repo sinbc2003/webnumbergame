@@ -977,7 +977,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   {isHost ? "HOST CONTROL" : "관전자 모드"}
                 </span>
               </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="mt-4 space-y-4">
                 {(["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => {
                   const boardSlot: BoardSlot = slot === "player_one" ? "playerOne" : "playerTwo";
                   const assignedUser = boardSlot === "playerOne" ? playerOne : playerTwo;

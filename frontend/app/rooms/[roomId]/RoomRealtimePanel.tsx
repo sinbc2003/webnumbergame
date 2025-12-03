@@ -9,9 +9,12 @@ import { getRuntimeConfig } from "@/lib/runtimeConfig";
 import { describeRoomMode } from "@/lib/roomLabels";
 import type { Participant, Room } from "@/types/api";
 
-interface EventMessage {
-  type: string;
-  [key: string]: any;
+interface RoomChatMessage {
+  id: string;
+  userId: string;
+  username: string;
+  message: string;
+  timestamp: string;
 }
 
 interface Props {
@@ -33,7 +36,10 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const roomCode = room.code;
   const hostId = room.host_id;
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
-  const [events, setEvents] = useState<EventMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<RoomChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const [chatErrorMessage, setChatErrorMessage] = useState<string | null>(null);
   const [roundNumber, setRoundNumber] = useState(room.current_round);
   const [durationMinutes, setDurationMinutes] = useState(3);
   const [problemCount, setProblemCount] = useState(5);
@@ -44,6 +50,7 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const [playerTwo, setPlayerTwo] = useState<string | undefined>(room.player_two_id ?? undefined);
   const [participantList, setParticipantList] = useState<Participant[]>(participants);
   const joinStateRef = useRef<{ userId?: string; joined: boolean }>({ joined: false });
+  const chatBodyRef = useRef<HTMLDivElement | null>(null);
 
   const { user } = useAuth();
   const router = useRouter();
@@ -143,8 +150,21 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         } else if (data.type === "room_closed") {
           setError("방장이 방을 종료했습니다.");
           setTimeout(() => router.push("/rooms"), 1000);
+        } else if (data.type === "chat_message") {
+          setChatMessages((prev) => {
+            const next = [
+              ...prev,
+              {
+                id: data.message_id ?? `${Date.now()}-${prev.length}`,
+                userId: data.user_id ?? "unknown",
+                username: data.username ?? "익명",
+                message: data.message ?? "",
+                timestamp: data.timestamp ?? new Date().toISOString(),
+              },
+            ];
+            return next.slice(-50);
+          });
         }
-        setEvents((prev) => [data, ...prev].slice(0, 30));
       } catch {
         // ignore malformed payloads
       }
@@ -195,7 +215,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
     };
   });
 
-  const spectatorCount = participantList.filter((p) => p.role !== "player").length;
   const modeLabel = describeRoomMode({ mode: room.mode, team_size: room.team_size });
   const statusLabel =
     room.status === "in_progress" ? "진행 중" : room.status === "completed" ? "종료" : "대기 중";
@@ -208,66 +227,77 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const mapName = room.description?.trim() || "추억의 성큰웨이 #X2";
   const hostDisplayName = displayName(participantList.find((p) => p.user_id === hostId), hostId);
 
-  const describeEvent = (event: EventMessage) => {
-    switch (event.type) {
-      case "player_assignment":
-        return "플레이어 구성이 변경되었습니다.";
-      case "participant_joined":
-        return `${displayName(event.participant)} 님이 입장했습니다.`;
-      case "participant_left":
-        return "참가자가 퇴장했습니다.";
-      case "round_started":
-        return "라운드가 시작되었습니다.";
-      case "round_finished":
-        return "라운드가 종료되었습니다.";
-      case "problem_advanced":
-        return "다음 문제로 이동했습니다.";
-      default:
-        return JSON.stringify(event);
+  const formatChatTime = (value: string) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const canSendChat = Boolean(user);
+
+  useEffect(() => {
+    if (!chatBodyRef.current) return;
+    chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+  }, [chatMessages]);
+
+  const handleSendChat = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!canSendChat) {
+      setChatErrorMessage("로그인 후 대화를 보낼 수 있습니다.");
+      return;
+    }
+    const trimmed = chatInput.trim();
+    if (!trimmed) {
+      return;
+    }
+    setChatSending(true);
+    setChatErrorMessage(null);
+    try {
+      await api.post(`/rooms/${roomId}/chat`, { message: trimmed });
+      setChatInput("");
+    } catch (err: any) {
+      setChatErrorMessage(err?.response?.data?.detail ?? "메시지를 보내지 못했습니다.");
+    } finally {
+      setChatSending(false);
     }
   };
 
   return (
     <div className="space-y-5 text-sm text-night-200">
       <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
-        <div className="grid gap-5">
-          <div className="rounded-2xl border border-night-800 bg-[radial-gradient(circle_at_top,#202f55,#060b18)] p-4">
-            <div className="grid grid-cols-6 gap-1">
-              {Array.from({ length: 24 }).map((_, index) => (
-                <div
-                  key={`cell-${index}`}
-                  className={`h-6 rounded-sm ${
-                    index % 5 === 0 ? "bg-emerald-400/60" : index % 7 === 0 ? "bg-red-400/40" : "bg-night-800/80"
-                  }`}
-                />
-              ))}
-            </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">ROOM OVERVIEW</p>
+            <p className="mt-1 text-2xl font-semibold text-white">{room.name}</p>
+            <p className="text-sm text-night-400">방 코드 {room.code}</p>
           </div>
-          <div className="grid gap-3 text-xs text-night-300 sm:grid-cols-2">
-            <div>
-              <p className="text-night-500">게임 이름</p>
-              <p className="text-lg font-semibold text-white">{room.name}</p>
-            </div>
-            <div>
-              <p className="text-night-500">지도 이름</p>
-              <p className="text-lg font-semibold text-white">{mapName}</p>
-            </div>
-            <div>
-              <p className="text-night-500">모드</p>
-              <p className="text-lg font-semibold text-white">{modeLabel}</p>
-            </div>
-            <div>
-              <p className="text-night-500">호스트</p>
-              <p className="text-lg font-semibold text-white">{hostDisplayName}</p>
-            </div>
-            <div>
-              <p className="text-night-500">진행 시간</p>
-              <p className="text-lg font-semibold text-white">{durationMinutes}분</p>
-            </div>
-            <div>
-              <p className="text-night-500">문제 개수</p>
-              <p className="text-lg font-semibold text-white">{problemCount}개</p>
-            </div>
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClass}`}>{statusLabel}</span>
+        </div>
+        <div className="mt-4 grid gap-3 text-xs text-night-300 sm:grid-cols-2">
+          <div>
+            <p className="text-night-500">모드</p>
+            <p className="text-lg font-semibold text-white">{modeLabel}</p>
+          </div>
+          <div>
+            <p className="text-night-500">호스트</p>
+            <p className="text-lg font-semibold text-white">{hostDisplayName}</p>
+          </div>
+          <div>
+            <p className="text-night-500">지도 이름</p>
+            <p className="text-lg font-semibold text-white">{mapName}</p>
+          </div>
+          <div>
+            <p className="text-night-500">참가자</p>
+            <p className="text-lg font-semibold text-white">{participantItems.length}명 참가 중</p>
+          </div>
+          <div>
+            <p className="text-night-500">진행 시간</p>
+            <p className="text-lg font-semibold text-white">{durationMinutes}분</p>
+          </div>
+          <div>
+            <p className="text-night-500">문제 개수</p>
+            <p className="text-lg font-semibold text-white">{problemCount}개</p>
           </div>
         </div>
       </div>
@@ -365,19 +395,48 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         </div>
       </div>
 
-      {events.length > 0 && (
-        <div className="rounded-3xl border border-night-800/70 bg-black/60 p-4 font-mono text-xs text-emerald-200">
-          <p className="font-sans text-sm font-semibold text-night-200">실시간 로그</p>
-          <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
-            {events.map((event, index) => (
-              <p key={`${event.type}-${index}`} className="flex items-center gap-2">
-                <span className="font-sans text-[10px] text-amber-300">[{event.type}]</span>
-                <span>{describeEvent(event)}</span>
-              </p>
-            ))}
-          </div>
+      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-white">방 채팅</p>
+          <span className="text-xs text-night-500">실시간 대화</span>
         </div>
-      )}
+        <div
+          ref={chatBodyRef}
+          className="mt-3 max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
+        >
+          {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
+          {chatMessages.map((message) => (
+            <div key={message.id} className="space-y-1 rounded-xl border border-night-800/60 bg-night-900/40 p-2">
+              <div className="flex items-center justify-between text-[11px] text-night-500">
+                <span className="font-semibold text-white">{message.username}</span>
+                <span>{formatChatTime(message.timestamp)}</span>
+              </div>
+              <p className="whitespace-pre-wrap break-words text-night-100">{message.message}</p>
+            </div>
+          ))}
+        </div>
+        {chatErrorMessage && <p className="mt-2 text-xs text-red-400">{chatErrorMessage}</p>}
+        {canSendChat ? (
+          <form onSubmit={handleSendChat} className="mt-3 flex gap-2">
+            <input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              maxLength={500}
+              placeholder="메시지를 입력하세요"
+              className="flex-1 rounded-xl border border-night-800 bg-night-950 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={chatSending || !chatInput.trim()}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
+            >
+              {chatSending ? "전송 중..." : "전송"}
+            </button>
+          </form>
+        ) : (
+          <p className="mt-3 text-xs text-night-500">로그인 후 대화에 참여할 수 있습니다.</p>
+        )}
+      </div>
     </div>
   );
 }
