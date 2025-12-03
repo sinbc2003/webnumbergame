@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
-import { describeRoomMode } from "@/lib/roomLabels";
+import { describeRoomMode, describeMatchup } from "@/lib/roomLabels";
 import type { ActiveMatch, Participant, RoundType, Room } from "@/types/api";
 
 type BoardSlot = "playerOne" | "playerTwo";
@@ -447,6 +447,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   };
 
   const roundLabel = describeRoomMode({ mode: room.mode, team_size: teamSize });
+  const matchupLabel = describeMatchup(teamSize);
+  const slotHeading = teamSize > 1 ? `${matchupLabel} 릴레이` : "Slot A / Slot B";
   const participantQueue = useMemo(() => {
     return participantState
       .map((participant, index) => ({ participant, index }))
@@ -1178,7 +1180,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">플레이어 슬롯</p>
-                <p className="text-2xl font-semibold text-white">Slot A / Slot B</p>
+                <p className="text-2xl font-semibold text-white">{slotHeading}</p>
               </div>
               <span className="rounded-full border border-indigo-500/50 px-3 py-1 text-[11px] tracking-[0.35em] text-indigo-200">
                 {isHost ? "HOST CONTROL" : "관전자 모드"}
