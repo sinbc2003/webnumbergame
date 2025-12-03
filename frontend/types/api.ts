@@ -1,5 +1,6 @@
 export type RoomStatus = "waiting" | "in_progress" | "completed" | "archived";
 export type RoundType = "round1_individual" | "round2_team";
+export type RoomMode = "individual" | "team" | "tournament";
 
 export interface User {
   id: string;
@@ -23,6 +24,8 @@ export interface Room {
   host_id: string;
   status: RoomStatus;
   round_type: RoundType;
+  mode: RoomMode;
+  team_size: number;
   max_players: number;
   current_round: number;
   player_one_id?: string | null;

@@ -23,13 +23,17 @@ class RoomService:
 
     async def create_room(self, *, host: User, payload: RoomCreate) -> Room:
         code = self._generate_code()
+        player_slots = max(2, payload.team_size * 2)
+        capacity = min(player_slots, settings.max_room_capacity)
         room = Room(
             code=code,
             name=payload.name,
             description=payload.description,
             host_id=host.id,
             round_type=payload.round_type,
-            max_players=settings.max_room_capacity,
+            mode=payload.mode,
+            team_size=payload.team_size,
+            max_players=capacity,
             player_one_id=host.id,
         )
         self.session.add(room)

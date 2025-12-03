@@ -13,6 +13,12 @@ class RoundType(str, Enum):
     ROUND2_TEAM = "round2_team"
 
 
+class RoomMode(str, Enum):
+    INDIVIDUAL = "individual"
+    TEAM = "team"
+    TOURNAMENT = "tournament"
+
+
 class MatchStatus(str, Enum):
     PENDING = "pending"
     ACTIVE = "active"

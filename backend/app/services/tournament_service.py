@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from ..enums import TournamentStatus, RoundType, RoomStatus, ParticipantRole
+from ..enums import TournamentStatus, RoundType, RoomStatus, ParticipantRole, RoomMode
 from ..models import Tournament, TournamentSlot, TournamentMatch, User, Room, RoomParticipant
 from ..schemas.tournament import TournamentCreate, SlotSeed
 
@@ -168,6 +168,8 @@ class TournamentService:
             host_id=slot_a.user_id,
             status=RoomStatus.WAITING,
             round_type=RoundType.ROUND1_INDIVIDUAL,
+            mode=RoomMode.INDIVIDUAL,
+            team_size=1,
             max_players=32,
             tournament_id=tournament.id,
             player_one_id=slot_a.user_id,

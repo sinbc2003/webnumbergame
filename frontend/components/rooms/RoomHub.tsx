@@ -7,12 +7,8 @@ import useSWR from "swr";
 
 import type { Participant, Room } from "@/types/api";
 import api from "@/lib/api";
+import { describeRoomMode } from "@/lib/roomLabels";
 import RoomCreateBoard from "./RoomCreateBoard";
-
-const roundLabels: Record<string, string> = {
-  round1_individual: "1vs1 개인전",
-  round2_team: "팀전",
-};
 
 const fetchParticipants = async (roomId: string) => {
   const { data } = await api.get<Participant[]>(`/rooms/${roomId}/participants`);
@@ -61,7 +57,7 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
       const matchesSearch = room.name.toLowerCase().includes(search.trim().toLowerCase());
       if (!matchesSearch) return false;
       if (modeFilter === "all") return true;
-      return modeFilter === "solo" ? room.round_type === "round1_individual" : room.round_type === "round2_team";
+      return modeFilter === "solo" ? room.mode === "individual" : room.mode === "team";
     });
   }, [rooms, search, modeFilter]);
   const selectedRoom = filtered.find((room) => room.id === selectedRoomId) ?? filtered[0];
@@ -122,7 +118,7 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
               >
                 <span className="room-list__players">-- / {room.max_players}</span>
                 <span className="room-list__name">{room.name}</span>
-                <span>{roundLabels[room.round_type] ?? room.round_type}</span>
+                <span>{describeRoomMode({ mode: room.mode, team_size: room.team_size })}</span>
                 <span>{new Date(room.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
               </button>
             ))}
@@ -134,7 +130,7 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
         {selectedRoom ? (
           <>
             <p className="room-join__title">{selectedRoom.name}</p>
-            <p className="room-join__label">{roundLabels[selectedRoom.round_type] ?? selectedRoom.round_type}</p>
+            <p className="room-join__label">{describeRoomMode({ mode: selectedRoom.mode, team_size: selectedRoom.team_size })}</p>
             <dl className="room-join__meta">
               <div>
                 <dt>Players</dt>

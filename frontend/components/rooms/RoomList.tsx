@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { Room } from "@/types/api";
+import { describeModeBadge } from "@/lib/roomLabels";
 
 interface Props {
   rooms: Room[];
@@ -29,7 +30,7 @@ export default function RoomList({ rooms }: Props) {
               <p className="text-sm text-night-400">{room.description ?? "설명 없음"}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs uppercase text-night-400">{room.round_type === "round1_individual" ? "개인전" : "팀전"}</p>
+              <p className="text-xs uppercase text-night-400">{describeModeBadge({ mode: room.mode, team_size: room.team_size })}</p>
               <p className="text-sm text-night-300">코드 {room.code}</p>
             </div>
           </div>

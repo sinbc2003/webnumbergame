@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
+import { describeRoomMode } from "@/lib/roomLabels";
 import type { ActiveMatch, Participant, RoundType, Room } from "@/types/api";
 
 type BoardSlot = "playerOne" | "playerTwo";
@@ -100,9 +101,6 @@ const countOperators = (expression: string): number =>
   expression.split("").filter((char) => char === "+" || char === "*").length;
 const INPUT_WARNING = "사용 가능한 기호는 1, +, *, (, ) 만 허용됩니다.";
 const CRITICAL_COUNTDOWN_THRESHOLD = 5;
-const TEAM_MEMBER_COUNT = 4;
-const TEAM_DEFAULT_ALLOCATION = [8, 8, 8, 8];
-const TEAM_MEMBER_LABELS = ["1번 주자", "2번 주자", "3번 주자", "4번 주자"];
 const TEAM_ALLOWED_SYMBOLS: Array<{ symbol: string; label: string }> = [
   { symbol: "1", label: "1" },
   { symbol: "(", label: "(" },
@@ -117,10 +115,36 @@ const TEAM_COST_TABLE: Record<string, number> = {
   "(": 1,
   ")": 1,
 };
+const TEAM_MEMBER_LABEL_MAP: Record<number, string[]> = {
+  2: ["1번 주자", "2번 주자"],
+  4: ["1번 주자", "2번 주자", "3번 주자", "4번 주자"],
+};
+const TEAM_TOTAL_BUDGET = 32;
 
-const createDefaultTeamMembers = (): TeamMemberState[] =>
-  TEAM_MEMBER_LABELS.map((name, index) => {
-    const allocation = TEAM_DEFAULT_ALLOCATION[index] ?? TEAM_DEFAULT_ALLOCATION[0];
+const buildMemberNames = (teamSize: number) => {
+  if (TEAM_MEMBER_LABEL_MAP[teamSize]) {
+    return TEAM_MEMBER_LABEL_MAP[teamSize]!;
+  }
+  return Array.from({ length: teamSize }, (_, index) => `${index + 1}번 주자`);
+};
+
+const buildAllocations = (teamSize: number) => {
+  const normalized = Math.max(1, teamSize);
+  const base = Math.max(4, Math.floor(TEAM_TOTAL_BUDGET / normalized));
+  const allocations = Array.from({ length: normalized }, () => base);
+  let remainder = TEAM_TOTAL_BUDGET - base * normalized;
+  for (let index = 0; index < allocations.length && remainder > 0; index += 1) {
+    allocations[index] += 1;
+    remainder -= 1;
+  }
+  return allocations;
+};
+
+const createDefaultTeamMembers = (teamSize: number): TeamMemberState[] => {
+  const names = buildMemberNames(teamSize);
+  const allocations = buildAllocations(teamSize);
+  return names.map((name, index) => {
+    const allocation = allocations[index] ?? allocations[0] ?? 8;
     return {
       name,
       allocation,
@@ -128,6 +152,7 @@ const createDefaultTeamMembers = (): TeamMemberState[] =>
       input: "",
     };
   });
+};
 
 interface Props {
   room: Room;
@@ -152,6 +177,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const { user } = useAuth();
   const router = useRouter();
   const isTeamRound = roundType === "round2_team";
+  const teamSize = Math.max(1, room.team_size ?? (isTeamRound ? 4 : 1));
   const [playerOne, setPlayerOne] = useState<string | undefined>(initialPlayerOne);
   const [playerTwo, setPlayerTwo] = useState<string | undefined>(initialPlayerTwo);
   const [boards, setBoards] = useState<{ playerOne: BoardState; playerTwo: BoardState }>({
@@ -359,7 +385,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     [participantState],
   );
 
-  const roundLabel = roundType === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
+  const roundLabel = describeRoomMode({ mode: room.mode, team_size: teamSize });
   const participantQueue = useMemo(() => {
     return participantState
       .map((participant, index) => ({ participant, index }))
@@ -853,6 +879,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   <TeamBoard
                     key={slot}
                     matchId={activeMatch.match_id}
+                    teamSize={teamSize}
                     expression={boards[slot].expression}
                     history={boards[slot].history}
                     onExpressionChange={(value) => handleExpressionChange(slot, value)}
@@ -1182,6 +1209,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
 interface TeamBoardProps {
   matchId: string;
+  teamSize: number;
   expression: string;
   history: HistoryEntry[];
   onExpressionChange: (value: string) => void;
@@ -1194,6 +1222,7 @@ interface TeamBoardProps {
 
 function TeamBoard({
   matchId,
+  teamSize,
   expression,
   history,
   onExpressionChange,
@@ -1203,7 +1232,7 @@ function TeamBoard({
   playTone,
   armAudio,
 }: TeamBoardProps) {
-  const [members, setMembers] = useState<TeamMemberState[]>(() => createDefaultTeamMembers());
+  const [members, setMembers] = useState<TeamMemberState[]>(() => createDefaultTeamMembers(teamSize));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1212,12 +1241,12 @@ function TeamBoard({
   const canEditAllocation = combined.length === 0;
 
   useEffect(() => {
-    setMembers(createDefaultTeamMembers());
+    setMembers(createDefaultTeamMembers(teamSize));
     setCurrentIndex(0);
     setMessage(null);
     setError(null);
     onExpressionChange("");
-  }, [matchId, onExpressionChange]);
+  }, [matchId, onExpressionChange, teamSize]);
 
   useEffect(() => {
     if (combined !== expression) {
@@ -1274,22 +1303,24 @@ function TeamBoard({
   };
 
   const handleNext = () => {
-    if (currentIndex >= TEAM_MEMBER_COUNT - 1) {
+    if (currentIndex >= members.length - 1) {
       setMessage("모든 주자의 입력이 완료되었습니다. 필요하면 이전 주자를 선택해 조정하세요.");
       return;
     }
     setCurrentIndex((prev) => prev + 1);
-    setMessage(`${TEAM_MEMBER_LABELS[currentIndex + 1]} 차례입니다.`);
+    const nextMember = members[currentIndex + 1];
+    setMessage(nextMember ? `${nextMember.name} 차례입니다.` : null);
   };
 
   const handlePrev = () => {
     if (currentIndex === 0) return;
     setCurrentIndex((prev) => prev - 1);
-    setMessage(`${TEAM_MEMBER_LABELS[currentIndex - 1]} 차례로 돌아갔습니다.`);
+    const prevMember = members[currentIndex - 1];
+    setMessage(prevMember ? `${prevMember.name} 차례로 돌아갔습니다.` : null);
   };
 
   const handleReset = () => {
-    setMembers(createDefaultTeamMembers());
+    setMembers(createDefaultTeamMembers(teamSize));
     setCurrentIndex(0);
     setMessage(null);
     setError(null);

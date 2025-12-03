@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
+import { describeRoomMode } from "@/lib/roomLabels";
 import type { Participant, Room } from "@/types/api";
 
 interface EventMessage {
@@ -195,7 +196,7 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   });
 
   const spectatorCount = participantList.filter((p) => p.role !== "player").length;
-  const modeLabel = room.round_type === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
+  const modeLabel = describeRoomMode({ mode: room.mode, team_size: room.team_size });
   const statusLabel =
     room.status === "in_progress" ? "진행 중" : room.status === "completed" ? "종료" : "대기 중";
   const statusBadgeClass =

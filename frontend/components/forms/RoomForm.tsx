@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import api from "@/lib/api";
-import type { Room, RoundType } from "@/types/api";
+import type { Room, RoundType, RoomMode } from "@/types/api";
 import { useShellTransition } from "@/hooks/useShellTransition";
 
 interface Props {
@@ -16,9 +16,21 @@ export default function RoomForm({ onCreated }: Props) {
   const transition = useShellTransition();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [mode, setMode] = useState<RoundType>("round1_individual");
+  const [roundType, setRoundType] = useState<RoundType>("round1_individual");
+  const [matchMode, setMatchMode] = useState<RoomMode>("individual");
+  const [teamSize, setTeamSize] = useState(1);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (matchMode === "team") {
+      setRoundType("round2_team");
+      setTeamSize((prev) => (prev === 2 || prev === 4 ? prev : 2));
+    } else {
+      setRoundType("round1_individual");
+      setTeamSize((prev) => (prev >= 1 && prev <= 3 ? prev : 1));
+    }
+  }, [matchMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +40,9 @@ export default function RoomForm({ onCreated }: Props) {
       const { data } = await api.post<Room>("/rooms", {
         name,
         description,
-        round_type: mode,
+        round_type: roundType,
+        mode: matchMode,
+        team_size: teamSize,
       });
       setStatusMessage("방이 생성되었습니다.");
       onCreated?.(data);
@@ -62,14 +76,35 @@ export default function RoomForm({ onCreated }: Props) {
         />
       </label>
       <label className="block text-sm text-night-300">
-        모드
+        게임 분류
         <select
-          value={mode}
-          onChange={(e) => setMode(e.target.value as RoundType)}
+          value={matchMode}
+          onChange={(e) => setMatchMode(e.target.value as RoomMode)}
           className="mt-1 w-full rounded-lg border border-night-700 bg-night-950/70 p-2 text-white"
         >
-          <option value="round1_individual">1라운드 개인전</option>
-          <option value="round2_team">2라운드 팀전</option>
+          <option value="individual">개인전</option>
+          <option value="team">팀전</option>
+        </select>
+      </label>
+      <label className="block text-sm text-night-300">
+        대전 방식
+        <select
+          value={teamSize}
+          onChange={(e) => setTeamSize(Number(e.target.value))}
+          className="mt-1 w-full rounded-lg border border-night-700 bg-night-950/70 p-2 text-white"
+        >
+          {matchMode === "individual" ? (
+            <>
+              <option value={1}>1 vs 1 (기본)</option>
+              <option value={2}>2 vs 2 (릴레이)</option>
+              <option value={3}>3 vs 3 (릴레이)</option>
+            </>
+          ) : (
+            <>
+              <option value={2}>2 vs 2 팀전</option>
+              <option value={4}>4 vs 4 팀전</option>
+            </>
+          )}
         </select>
       </label>
       {statusMessage && <p className="text-sm text-night-300">{statusMessage}</p>}

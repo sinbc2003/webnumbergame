@@ -43,8 +43,6 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
     );
   }
 
-  const roundLabel = room.round_type === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
-
   return (
     <TopNav layout="focus" showChat={false} hideFocusHeader>
       <main className="mx-auto max-w-6xl py-6">

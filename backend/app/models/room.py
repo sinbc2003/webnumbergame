@@ -4,7 +4,7 @@ from typing import Optional
 
 from sqlmodel import Field, SQLModel
 
-from ..enums import RoomStatus, RoundType, ParticipantRole
+from ..enums import RoomStatus, RoundType, ParticipantRole, RoomMode
 
 
 class Room(SQLModel, table=True):
@@ -18,6 +18,8 @@ class Room(SQLModel, table=True):
     status: RoomStatus = Field(default=RoomStatus.WAITING)
     current_round: int = Field(default=1)
     round_type: RoundType = Field(default=RoundType.ROUND1_INDIVIDUAL)
+    mode: RoomMode = Field(default=RoomMode.INDIVIDUAL, index=True)
+    team_size: int = Field(default=1, ge=1, le=8)
     tournament_id: Optional[str] = Field(default=None, foreign_key="tournaments.id")
     expires_at: Optional[datetime] = Field(default=None)
     max_players: int = Field(default=16)
