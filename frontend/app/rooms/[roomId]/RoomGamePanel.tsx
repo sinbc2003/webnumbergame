@@ -965,7 +965,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
         </div>
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[2.5fr,1.5fr]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-[3fr,1.5fr]">
           <div className="space-y-4">
             <div className="rounded-2xl border border-night-800/70 bg-night-950/30 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
