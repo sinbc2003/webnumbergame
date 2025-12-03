@@ -971,13 +971,13 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">플레이어 슬롯</p>
-                  <p className="text-2xl font-semibold text-white">입장 순으로 자동 배치</p>
+                  <p className="text-2xl font-semibold text-white">Slot A / Slot B</p>
                 </div>
                 <span className="rounded-full border border-indigo-500/50 px-3 py-1 text-[11px] tracking-[0.35em] text-indigo-200">
                   {isHost ? "HOST CONTROL" : "관전자 모드"}
                 </span>
               </div>
-              <div className="mt-4 space-y-4">
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
                 {(["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => {
                   const boardSlot: BoardSlot = slot === "player_one" ? "playerOne" : "playerTwo";
                   const assignedUser = boardSlot === "playerOne" ? playerOne : playerTwo;

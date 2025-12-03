@@ -402,7 +402,7 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         </div>
         <div
           ref={chatBodyRef}
-          className="mt-3 max-h-64 space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
+          className="mt-3 h-64 space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
         >
           {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
           {chatMessages.map((message) => (
