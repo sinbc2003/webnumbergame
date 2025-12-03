@@ -1411,7 +1411,7 @@ function PlayerPanel({
             disabled={!isMine || disabled || submitting}
             spellCheck={false}
             autoComplete="off"
-            className="mt-6 min-h-[320px] w-full flex-1 rounded-2xl border-2 border-indigo-500/40 bg-night-900 px-4 py-4 font-mono text-2xl text-white focus:border-indigo-300 focus:outline-none"
+            className="mt-6 min-h-[160px] w-full flex-1 rounded-2xl border-2 border-indigo-500/40 bg-night-900 px-4 py-4 font-mono text-2xl text-white focus:border-indigo-300 focus:outline-none"
           />
           {warningMessage && <p className="mt-2 text-sm text-amber-200/90">{warningMessage}</p>}
           {isMine && onSubmit && (
