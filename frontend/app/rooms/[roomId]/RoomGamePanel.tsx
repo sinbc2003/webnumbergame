@@ -89,6 +89,27 @@ type RoundOutcome = {
   score?: number | null;
 };
 
+interface MatchSummary {
+  finishedAt: string;
+  reason: string;
+  winnerId: string | null;
+  winnerLabel: string;
+  winnerExpression?: string | null;
+  winnerScore?: number | null;
+  targetNumber?: number | null;
+  totalProblems?: number | null;
+  optimalCost?: number | null;
+  matchup: string;
+  histories: {
+    playerOne: HistoryEntry[];
+    playerTwo: HistoryEntry[];
+  };
+  players: {
+    playerOneLabel: string;
+    playerTwoLabel: string;
+  };
+}
+
 const allowedTokens = new Set(["1", "+", "*", "(", ")"]);
 const sanitizeExpression = (value: string) =>
   value
@@ -197,6 +218,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerOne: createBoardState(),
     playerTwo: createBoardState(),
   });
+  const boardsRef = useRef<{ playerOne: BoardState; playerTwo: BoardState }>(boards);
   const [pendingInput, setPendingInput] = useState<{ slot: BoardSlot; value: string } | null>(null);
   const [submittingSlot, setSubmittingSlot] = useState<BoardSlot | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -208,6 +230,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerTwo: null,
   });
   const [roundOutcome, setRoundOutcome] = useState<RoundOutcome | null>(null);
+  const [matchSummary, setMatchSummary] = useState<MatchSummary | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
+  const [roomClosedReason, setRoomClosedReason] = useState<string | null>(null);
   const [preCountdown, setPreCountdown] = useState<number | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [assigningSlot, setAssigningSlot] = useState<PlayerAssignmentSlot | null>(null);
@@ -215,6 +240,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const audioContextRef = useRef<AudioContext | null>(null);
   const userInteractedRef = useRef(false);
   const tickRef = useRef<number | null>(null);
+  const activeMatchRef = useRef<ActiveMatch | null>(null);
   const [initialRemaining, setInitialRemaining] = useState<number | null>(null);
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
   const [slotSelections, setSlotSelections] = useState<{ player_one: string; player_two: string }>({
@@ -268,6 +294,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   }, [participants]);
 
   useEffect(() => {
+    boardsRef.current = boards;
+  }, [boards]);
+
+  useEffect(() => {
     return () => {
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
@@ -288,6 +318,17 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
   const activeMatch = data ?? null;
   const hasActiveMatch = Boolean(activeMatch);
+
+  useEffect(() => {
+    activeMatchRef.current = activeMatch;
+  }, [activeMatch]);
+
+  useEffect(() => {
+    if (hasActiveMatch) {
+      setShowSummary(false);
+      setRoomClosedReason(null);
+    }
+  }, [hasActiveMatch]);
 
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
   const isHost = user?.id === room.host_id;
@@ -568,6 +609,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     }
   }, [hasActiveMatch, isHost, leaving, roomId, router, user]);
 
+  const handleReturnToLobby = useCallback(() => {
+    router.push("/rooms");
+  }, [router]);
+
   const renderLeaveButton = () => (
     <button
       type="button"
@@ -731,6 +776,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             const winnerSubmission = payload.winner_submission;
             const winnerId =
               payload.winner_user_id ?? winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
+            const boardSnapshot = boardsRef.current;
+            const historySnapshot = {
+              playerOne: boardSnapshot.playerOne.history.map((entry) => ({ ...entry })),
+              playerTwo: boardSnapshot.playerTwo.history.map((entry) => ({ ...entry })),
+            };
+            const activeSnapshot = activeMatchRef.current;
             setRoundOutcome({
               reason,
               winnerId,
@@ -782,6 +833,26 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               setStatusMessage("상대가 나가 라운드가 종료되었습니다.");
               setStatusError(null);
             }
+            const winnerLabel = winnerId ? participantLabel(winnerId) : "무승부";
+            setMatchSummary({
+              finishedAt: new Date().toISOString(),
+              reason,
+              winnerId,
+              winnerLabel,
+              winnerExpression: winnerSubmission?.expression ?? null,
+              winnerScore: winnerSubmission?.score ?? null,
+              targetNumber: activeSnapshot?.target_number ?? null,
+              totalProblems: activeSnapshot?.total_problems ?? null,
+              optimalCost: activeSnapshot?.optimal_cost ?? null,
+              matchup: matchupLabel,
+              histories: historySnapshot,
+              players: {
+                playerOneLabel: participantLabel(playerIdsRef.current.playerOne ?? undefined),
+                playerTwoLabel: participantLabel(playerIdsRef.current.playerTwo ?? undefined),
+              },
+            });
+            setShowSummary(true);
+            setRoomClosedReason(null);
             mutate();
             break;
           }
@@ -795,7 +866,42 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             } else {
               setStatusError("방장이 방을 종료했습니다.");
             }
-            setTimeout(() => router.push("/rooms"), 1000);
+            const summaryHistories = {
+              playerOne: boardsRef.current.playerOne.history.map((entry) => ({ ...entry })),
+              playerTwo: boardsRef.current.playerTwo.history.map((entry) => ({ ...entry })),
+            };
+            setMatchSummary((prev) => {
+              if (prev) {
+                return prev;
+              }
+              return {
+                finishedAt: new Date().toISOString(),
+                reason: closingReason,
+                winnerId: null,
+                winnerLabel: "경기가 종료되었습니다.",
+                winnerExpression: null,
+                winnerScore: null,
+                targetNumber: activeMatchRef.current?.target_number ?? null,
+                totalProblems: activeMatchRef.current?.total_problems ?? null,
+                optimalCost: activeMatchRef.current?.optimal_cost ?? null,
+                matchup: matchupLabel,
+                histories: summaryHistories,
+                players: {
+                  playerOneLabel: participantLabel(playerIdsRef.current.playerOne ?? undefined),
+                  playerTwoLabel: participantLabel(playerIdsRef.current.playerTwo ?? undefined),
+                },
+              };
+            });
+            setRoomClosedReason(
+              closingReason === "forfeit"
+                ? "상대 기권으로 방이 종료되었습니다."
+                : closingReason === "host_left" || closingReason === "host_left_forfeit"
+                  ? "방장이 퇴장해 방이 종료되었습니다."
+                  : closingReason === "host_disconnected"
+                    ? "방장 연결이 끊어져 방이 종료되었습니다."
+                    : "방이 종료되었습니다.",
+            );
+            setShowSummary(true);
             break;
           }
           case "chat_message": {
@@ -1175,6 +1281,27 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
         </div>
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
+        {matchSummary && !showSummary && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowSummary(true)}
+              className="rounded-full border border-amber-400/60 px-4 py-1 text-xs font-semibold uppercase tracking-[0.4em] text-amber-200 transition hover:border-amber-300"
+            >
+              최근 경기 요약 보기
+            </button>
+          </div>
+        )}
+        {showSummary && (
+          <div className="mt-3">
+            <MatchSummaryCard
+              summary={matchSummary}
+              roomClosedReason={roomClosedReason}
+              onClose={() => setShowSummary(false)}
+              onReturn={handleReturnToLobby}
+            />
+          </div>
+        )}
         <div className="mt-3 flex flex-1 flex-col gap-4 overflow-hidden">
           <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1767,6 +1894,173 @@ function PlayerPanel({
     </div>
   );
 }
+
+interface MatchSummaryCardProps {
+  summary: MatchSummary | null;
+  roomClosedReason: string | null;
+  onClose: () => void;
+  onReturn: () => void;
+}
+
+const translateSummaryReason = (reason: string) => {
+  switch (reason) {
+    case "timeout":
+      return "시간 종료";
+    case "forfeit":
+      return "기권";
+    case "optimal":
+      return "정답 제출";
+    default:
+      return "경기 종료";
+  }
+};
+
+const computeHistoryStats = (history: HistoryEntry[]) => {
+  if (!history.length) {
+    return { attempts: 0, bestEntry: null, lastEntry: null, average: null };
+  }
+  const bestEntry = history.reduce((best, entry) => (best && best.score >= entry.score ? best : entry), history[0]);
+  const lastEntry = history[history.length - 1];
+  const average = Math.round(history.reduce((sum, entry) => sum + entry.score, 0) / history.length);
+  return { attempts: history.length, bestEntry, lastEntry, average };
+};
+
+function MatchSummaryCard({ summary, roomClosedReason, onClose, onReturn }: MatchSummaryCardProps) {
+  if (!summary) {
+    return (
+      <div className="rounded-3xl border border-night-800/60 bg-night-950/40 p-5 text-sm text-night-200">
+        <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">Match Summary</p>
+        <p className="mt-2 text-2xl font-semibold text-white">경기가 종료되었습니다.</p>
+        {roomClosedReason && <p className="mt-1 text-night-400">{roomClosedReason}</p>}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={onReturn}
+            className="rounded-xl border border-indigo-500/60 px-4 py-2 text-sm font-semibold text-indigo-100 transition hover:border-indigo-400"
+          >
+            로비로 돌아가기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const reasonLabel = translateSummaryReason(summary.reason);
+  const players = [
+    {
+      key: "playerOne",
+      label: summary.players.playerOneLabel,
+      history: summary.histories.playerOne,
+    },
+    {
+      key: "playerTwo",
+      label: summary.players.playerTwoLabel,
+      history: summary.histories.playerTwo,
+    },
+  ];
+
+  return (
+    <div className="rounded-3xl border border-amber-400/30 bg-night-950/70 p-5 text-sm text-night-200 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.4em] text-amber-300/70">Match Summary</p>
+          <p className="mt-1 text-2xl font-semibold text-white">
+            {summary.winnerId ? `${summary.winnerLabel} 승리` : "무승부"}
+          </p>
+          <p className="text-xs text-night-400">
+            종료 사유: {reasonLabel} · {new Date(summary.finishedAt).toLocaleTimeString("ko-KR")}
+          </p>
+        </div>
+        <div className="text-right text-xs text-night-400">
+          {summary.targetNumber !== null && summary.targetNumber !== undefined && (
+            <p>
+              목표값 <span className="font-semibold text-white">{summary.targetNumber}</span>
+            </p>
+          )}
+          {summary.optimalCost !== null && summary.optimalCost !== undefined && (
+            <p>
+              최적 코스트 ≤ <span className="font-semibold text-white">{summary.optimalCost}</span>
+            </p>
+          )}
+          <p className="mt-1 text-night-500">{summary.matchup}</p>
+        </div>
+      </div>
+      {summary.winnerExpression && (
+        <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-50">
+          <p className="text-xs uppercase tracking-[0.3em] text-amber-200/80">Winner Expression</p>
+          <p className="mt-2 font-mono text-lg text-white">{summary.winnerExpression}</p>
+          {summary.winnerScore !== null && (
+            <p className="text-xs text-amber-200/80">점수 {summary.winnerScore}</p>
+          )}
+        </div>
+      )}
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {players.map((player) => {
+          const stats = computeHistoryStats(player.history);
+          return (
+            <div key={player.key} className="rounded-2xl border border-night-800/70 bg-night-900/50 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-lg font-semibold text-white">{player.label}</p>
+                <p className="text-xs text-night-400">시도 {stats.attempts}회</p>
+              </div>
+              {stats.bestEntry ? (
+                <div className="mt-3 rounded-xl border border-night-800/60 bg-night-950/40 p-3 text-xs">
+                  <p className="text-night-400">최고 점수</p>
+                  <p className="mt-1 font-mono text-base text-white">{stats.bestEntry.expression}</p>
+                  <p className="text-[11px] text-night-500">
+                    점수 {stats.bestEntry.score} | 값 {stats.bestEntry.value ?? "-"}
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-night-500">기록이 없습니다.</p>
+              )}
+              {stats.average !== null && (
+                <p className="mt-2 text-xs text-night-400">평균 점수 {stats.average}</p>
+              )}
+              <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-1 text-xs">
+                {player.history.length === 0 && (
+                  <p className="text-night-500">최근 제출 기록이 없습니다.</p>
+                )}
+                {player.history
+                  .slice(-5)
+                  .reverse()
+                  .map((entry, index) => (
+                    <div
+                      key={`${entry.timestamp}-${index}`}
+                      className="rounded-lg border border-night-800/60 bg-night-950/30 p-2"
+                    >
+                      <p className="font-semibold text-white">{entry.expression}</p>
+                      <p className="text-[11px] text-night-500">
+                        점수 {entry.score} | 값 {entry.value ?? "-"}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {roomClosedReason && <p className="mt-3 text-xs text-night-500">{roomClosedReason}</p>}
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={onReturn}
+          className="rounded-xl border border-indigo-500/60 px-4 py-2 text-sm font-semibold text-indigo-100 transition hover:border-indigo-400"
+        >
+          로비로 돌아가기
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-xl border border-night-700 px-4 py-2 text-sm font-semibold text-night-100 transition hover:border-night-500"
+        >
+          요약 닫기
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 function CountdownOverlay({ value }: { value: number }) {
   return (
