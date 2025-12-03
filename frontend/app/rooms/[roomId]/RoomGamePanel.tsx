@@ -95,8 +95,9 @@ const sanitizeExpression = (value: string) =>
     .split("")
     .filter((char) => allowedTokens.has(char))
     .join("");
+const normalizedForEvaluation = (value: string): string => sanitizeExpression(value).trim();
 const computeExpressionValue = (value: string): number | null => {
-  const sanitized = sanitizeExpression(value).trim();
+  const sanitized = normalizedForEvaluation(value);
   if (!sanitized) return null;
   if (/[\+\*\(]$/.test(sanitized)) return null;
   try {
@@ -110,7 +111,7 @@ const computeExpressionValue = (value: string): number | null => {
   }
 };
 const countOperators = (expression: string): number =>
-  expression.split("").filter((char) => char === "+" || char === "*").length;
+  normalizedForEvaluation(expression).split("").filter((char) => char === "+" || char === "*").length;
 const INPUT_WARNING = "사용 가능한 기호는 1, +, *, (, ) 만 허용됩니다.";
 const CRITICAL_COUNTDOWN_THRESHOLD = 5;
 const TEAM_ALLOWED_SYMBOLS: Array<{ symbol: string; label: string }> = [
@@ -386,11 +387,11 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const handleExpressionChange = useCallback(
     (slot: BoardSlot, rawValue: string) => {
       armAudio();
-      const sanitized = sanitizeExpression(rawValue);
       setBoards((prev) => ({
         ...prev,
-        [slot]: { ...prev[slot], expression: sanitized },
+        [slot]: { ...prev[slot], expression: rawValue },
       }));
+      const sanitized = sanitizeExpression(rawValue);
       setPendingInput({ slot, value: sanitized });
       setInputWarnings((prev) => ({
         ...prev,
@@ -661,6 +662,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           case "input_update": {
             const slot = slotFromUserId(payload.user_id);
             if (!slot) break;
+            if (payload.user_id === user?.id) break;
             setBoards((prev) => ({
               ...prev,
               [slot]: { ...prev[slot], expression: payload.expression ?? "" },
@@ -914,8 +916,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
   const submitExpression = async (slot: BoardSlot) => {
     armAudio();
-    const value = boards[slot].expression.trim();
-    if (!value) {
+    const rawValue = boards[slot].expression.trim();
+    const sanitized = normalizedForEvaluation(rawValue);
+    if (!sanitized) {
       setStatusError("식을 입력해 주세요.");
       return;
     }
@@ -924,7 +927,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     setStatusMessage(null);
     try {
       await api.post(`/rooms/${roomId}/submit`, {
-        expression: value,
+        expression: sanitized,
         mode: roundType,
         team_label: null,
       });
