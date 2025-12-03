@@ -81,6 +81,22 @@ const sanitizeExpression = (value: string) =>
     .split("")
     .filter((char) => allowedTokens.has(char))
     .join("");
+const computeExpressionValue = (value: string): number | null => {
+  const sanitized = sanitizeExpression(value).trim();
+  if (!sanitized) return null;
+  if (/[\+\*\(]$/.test(sanitized)) return null;
+  try {
+    const result = Function(`"use strict"; return (${sanitized});`)();
+    if (typeof result === "number" && Number.isFinite(result)) {
+      return result;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+const countOperators = (expression: string): number =>
+  expression.split("").filter((char) => char === "+" || char === "*").length;
 const INPUT_WARNING = "사용 가능한 기호는 1, +, *, (, ) 만 허용됩니다.";
 const CRITICAL_COUNTDOWN_THRESHOLD = 5;
 const TEAM_MEMBER_COUNT = 4;
@@ -735,6 +751,13 @@ export default function RoomGamePanel({ room, participants }: Props) {
   const hasActiveMatch = Boolean(activeMatch);
   const isPlayerView = hasActiveMatch && Boolean(mySlot);
   const visibleSlots: BoardSlot[] = isPlayerView && mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[]);
+  const myBoard = mySlot ? boards[mySlot] : null;
+  const myExpression = myBoard?.expression ?? "";
+  const myHistory = myBoard?.history ?? [];
+  const expressionValue = useMemo(() => computeExpressionValue(myExpression), [myExpression]);
+  const operatorCount = useMemo(() => countOperators(myExpression), [myExpression]);
+  const expressionValueDisplay = myExpression.trim() ? expressionValue ?? "-" : "-";
+  const operatorCountDisplay = myExpression.trim() ? operatorCount : "-";
   const formattedRemaining = formatRemaining();
   const countdownPercent =
     initialRemaining && remaining !== null && initialRemaining > 0
@@ -761,35 +784,55 @@ export default function RoomGamePanel({ room, participants }: Props) {
     return (
       <div className={`${containerClass} relative`}>
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
-        <div className="mb-3 flex justify-end">{renderLeaveButton()}</div>
-        <div className="grid gap-3 rounded-2xl border-2 border-amber-400/60 bg-night-900/60 p-5 text-sm text-night-200 sm:grid-cols-3">
-          <div>
-            <p className="text-amber-400 text-sm font-semibold">현재 문제</p>
-            <p className="text-5xl font-black text-amber-300 drop-shadow-lg">{activeMatch.target_number}</p>
-            <p className="mt-1 text-xs text-amber-200/80">지금 풀어야 할 목표 숫자</p>
-          </div>
-          <div>
-            <p className="text-night-500">남은 시간</p>
-            <p className={`text-3xl font-bold ${isCountdownCritical ? "text-red-400" : "text-indigo-300"}`}>
-              {formattedRemaining}
-            </p>
-            <div className="mt-2 h-2 w-full rounded-full bg-night-800">
-              <div
-                className={`h-full rounded-full ${isCountdownCritical ? "bg-red-500" : "bg-indigo-500"}`}
-                style={{ width: `${countdownPercent * 100}%` }}
-              />
+        <div className="flex h-full flex-col gap-4">
+          <div className="rounded-[32px] border-2 border-indigo-500/50 bg-night-950/70 px-5 py-4 text-night-100 shadow-[0_30px_80px_rgba(0,0,0,0.65)]">
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.55em] text-indigo-200/70">{roundLabel}</p>
+                <div className="mt-2 flex items-end gap-3">
+                  <span className="text-base text-night-400">문제 :</span>
+                  <span className="text-5xl font-black text-white sm:text-6xl">{activeMatch.target_number}</span>
+                </div>
+                <p className="mt-1 text-xs text-night-500">
+                  {activeMatch.current_index + 1} / {activeMatch.total_problems} 문제 진행 중
+                </p>
+              </div>
+              <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+                <div className="min-w-[130px] rounded-2xl border border-indigo-400/50 bg-night-900/70 px-4 py-3 text-right">
+                  <p className="text-[11px] tracking-[0.45em] text-indigo-200">값</p>
+                  <p className="text-3xl font-black text-white">{expressionValueDisplay}</p>
+                </div>
+                <div className="min-w-[150px] rounded-2xl border border-amber-400/50 bg-night-900/70 px-4 py-3 text-right">
+                  <p className="text-[11px] tracking-[0.35em] text-amber-200">연산기호개수</p>
+                  <p className="text-3xl font-black text-amber-200">{operatorCountDisplay}</p>
+                </div>
+                <div className="hidden sm:block">{renderLeaveButton()}</div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-night-400 sm:gap-4">
+              <p className="font-semibold text-amber-200">
+                최적 코스트 {activeMatch.optimal_cost} 이하로 정답을 만들면 즉시 승리!
+              </p>
+              <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-[0.4em] text-night-500">
+                {problemIndicators.map((state, index) => (
+                  <span
+                    key={`indicator-${index}`}
+                    className={`h-1.5 w-6 rounded-full ${state === "current" ? "bg-amber-400" : state === "done" ? "bg-emerald-400" : "bg-night-700"}`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-          <div>
-            <p className="text-amber-400 text-sm font-semibold">최적 코스트</p>
-            <p className="text-4xl font-extrabold text-amber-200">{activeMatch.optimal_cost}</p>
-            <p className="text-xs text-amber-200/80">이 코스트 이하로 정답을 만들면 즉시 승리</p>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="space-y-1 text-emerald-300">
+              {statusMessage && <p>• {statusMessage}</p>}
+            </div>
+            <div className="space-y-1 text-red-400">{statusError && <p>• {statusError}</p>}</div>
+            <div className="sm:hidden">{renderLeaveButton()}</div>
           </div>
-        </div>
-        {statusMessage && <p className="text-sm text-green-400">{statusMessage}</p>}
-        {statusError && <p className="text-sm text-red-400">{statusError}</p>}
-        <div className="flex flex-1 items-center">
-          <div className="w-full">
+
+          <div className="flex flex-1 flex-col">
             {visibleSlots.map((slot) => {
               const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
               const isMine = mySlot === slot;
@@ -828,6 +871,32 @@ export default function RoomGamePanel({ room, participants }: Props) {
                 />
               );
             })}
+          </div>
+
+          <div className="rounded-3xl border border-night-800/80 bg-night-950/50 px-6 py-4 text-night-300">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs text-night-500">문제 진행도</p>
+                <p className="text-lg font-semibold text-white">
+                  {activeMatch.current_index + 1} / {activeMatch.total_problems}
+                </p>
+              </div>
+              <div className="flex flex-1 justify-center">
+                <div
+                  className={`flex h-32 w-32 items-center justify-center rounded-full border-4 font-mono text-4xl sm:text-5xl ${
+                    isCountdownCritical ? "border-red-500 text-red-300" : "border-indigo-400 text-indigo-200"
+                  } bg-night-900/60`}
+                >
+                  {formattedRemaining}
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-night-500">남은 문제</p>
+                <p className="text-lg font-semibold text-white">
+                  {Math.max(0, activeMatch.total_problems - activeMatch.current_index - 1)}개
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1292,51 +1361,117 @@ function PlayerPanel({
   warningMessage,
   focusLayout,
 }: PlayerPanelProps) {
-  const containerClasses = focusLayout
-    ? "rounded-2xl border-2 border-indigo-600 bg-night-950/40 p-6 text-base text-night-100 shadow-xl"
-    : "rounded-xl border border-night-800 bg-night-950/30 p-4 text-sm text-night-200";
-  const textareaClasses = focusLayout
-    ? "mt-3 h-44 w-full rounded-xl border-2 border-indigo-600/40 bg-night-900 px-4 py-3 text-xl text-white focus:border-indigo-400 focus:outline-none"
-    : "mt-3 h-24 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none";
-  const historyWrapperClasses = focusLayout
-    ? "mt-3 max-h-56 space-y-3 overflow-y-auto text-sm text-night-200"
-    : "mt-2 max-h-36 space-y-2 overflow-y-auto text-xs text-night-400";
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      onSubmit?.();
+      return;
+    }
+    if (event.key === " " || event.key === "Tab") {
+      event.preventDefault();
+    }
+  };
+
+  if (focusLayout) {
+    const bestEntry =
+      history.length === 0
+        ? null
+        : history.reduce<HistoryEntry | null>((best, entry) => {
+            if (!best || entry.score > best.score) {
+              return entry;
+            }
+            return best;
+          }, null);
+    return (
+      <div className="flex flex-1 flex-col gap-6 lg:flex-row">
+        <div className="flex-1 rounded-[32px] border-2 border-indigo-600/40 bg-night-950/60 p-6 text-night-100 shadow-[0_25px_90px_rgba(0,0,0,0.6)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-indigo-200/80">{title}</p>
+              <p className="text-3xl font-semibold text-white">{userLabel}</p>
+            </div>
+            {isMine && (
+              <span className="rounded-full border border-indigo-400/70 px-4 py-1 text-xs font-semibold text-indigo-200">
+                내 화면
+              </span>
+            )}
+          </div>
+          <textarea
+            value={expression}
+            onChange={(e) => onExpressionChange?.(e.target.value)}
+            onFocus={onFocus}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={!isMine || disabled || submitting}
+            spellCheck={false}
+            autoComplete="off"
+            className="mt-6 min-h-[320px] w-full flex-1 rounded-2xl border-2 border-indigo-500/40 bg-night-900 px-4 py-4 font-mono text-2xl text-white focus:border-indigo-300 focus:outline-none"
+          />
+          {warningMessage && <p className="mt-2 text-sm text-amber-200/90">{warningMessage}</p>}
+          {isMine && onSubmit && (
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={disabled || submitting || !expression.trim()}
+              className="mt-4 h-14 w-full rounded-2xl bg-indigo-600 text-lg font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
+            >
+              {submitting ? "제출 중..." : "제출하기"}
+            </button>
+          )}
+          {isMine && <p className="mt-2 text-sm text-night-400">Enter 키를 누르면 즉시 제출됩니다.</p>}
+        </div>
+        <div className="w-full lg:w-80">
+          <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-4">
+            <p className="text-sm font-semibold text-white">최근 히스토리</p>
+            <div className="mt-3 max-h-[420px] space-y-3 overflow-y-auto pr-2">
+              {history.length === 0 && <p className="text-sm text-night-500">아직 제출 기록이 없습니다.</p>}
+              {history.map((entry, index) => (
+                <div
+                  key={`${entry.timestamp}-${index}`}
+                  className="rounded-2xl border border-night-800/70 bg-night-900/40 p-3 text-sm text-night-200"
+                >
+                  <p className="font-semibold text-white">{entry.expression}</p>
+                  <p className="text-xs text-night-400">
+                    점수 {entry.score} | 값 {entry.value ?? "-"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+          {bestEntry && (
+            <div className="mt-3 rounded-3xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+              <p className="font-semibold">🏆 최고 기록</p>
+              <p className="mt-1 font-mono text-lg text-white">{bestEntry.expression}</p>
+              <p className="text-xs text-amber-200/70">
+                점수 {bestEntry.score} | 값 {bestEntry.value ?? "-"}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={containerClasses}>
+    <div className="rounded-xl border border-night-800 bg-night-950/30 p-4 text-sm text-night-200">
       <div className="flex items-center justify-between">
         <div>
-          <p className={focusLayout ? "text-night-300 text-sm" : "text-night-400"}>{title}</p>
-          <p className={focusLayout ? "text-2xl font-semibold text-white" : "text-lg font-semibold text-white"}>
-            {userLabel}
-          </p>
+          <p className="text-night-400">{title}</p>
+          <p className="text-lg font-semibold text-white">{userLabel}</p>
         </div>
-        {isMine && (
-          <span className={focusLayout ? "rounded-full border border-indigo-400 px-3 py-1 text-xs text-indigo-200" : "text-xs text-indigo-400"}>
-            내 화면
-          </span>
-        )}
+        {isMine && <span className="text-xs text-indigo-400">내 화면</span>}
       </div>
 
       <textarea
         value={expression}
         onChange={(e) => onExpressionChange?.(e.target.value)}
         onFocus={onFocus}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
-            onSubmit?.();
-            return;
-          }
-          if (event.key === " " || event.key === "Tab") {
-            event.preventDefault();
-          }
-        }}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={!isMine || disabled || submitting}
         spellCheck={false}
         autoComplete="off"
-        className={textareaClasses}
+        className="mt-3 h-24 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
       />
 
       {warningMessage && <p className="mt-1 text-xs text-amber-200">{warningMessage}</p>}
@@ -1352,17 +1487,11 @@ function PlayerPanel({
         </button>
       )}
 
-      {isMine && (
-        <p className={focusLayout ? "mt-2 text-sm text-night-400" : "mt-1 text-xs text-night-500"}>
-          Enter 키를 누르면 즉시 제출됩니다.
-        </p>
-      )}
+      {isMine && <p className="mt-1 text-xs text-night-500">Enter 키를 누르면 즉시 제출됩니다.</p>}
 
       <div className="mt-4">
-        <p className={focusLayout ? "text-sm font-semibold text-night-200" : "text-xs font-semibold text-night-300"}>
-          최근 기록
-        </p>
-        <div className={historyWrapperClasses}>
+        <p className="text-xs font-semibold text-night-300">최근 기록</p>
+        <div className="mt-2 max-h-36 space-y-2 overflow-y-auto text-xs text-night-400">
           {history.length === 0 && <p>아직 제출 기록이 없습니다.</p>}
           {history.map((entry, index) => (
             <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
