@@ -230,6 +230,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerTwo: initialPlayerTwo,
   });
   const chatBodyRef = useRef<HTMLDivElement | null>(null);
+  const joinStateRef = useRef<{ userId?: string; joined: boolean }>({ joined: false });
 
   useEffect(() => {
     const next = room.player_one_id ?? undefined;
@@ -427,6 +428,23 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
   const canSendChat = Boolean(user);
 
+  const refreshRoomSnapshot = useCallback(async () => {
+    try {
+      const { data } = await api.get<Room>(`/rooms/${roomId}`);
+      const nextOne = data.player_one_id ?? undefined;
+      const nextTwo = data.player_two_id ?? undefined;
+      playerIdsRef.current = { playerOne: nextOne, playerTwo: nextTwo };
+      setPlayerOne(nextOne);
+      setPlayerTwo(nextTwo);
+      setSlotSelections({
+        player_one: nextOne ?? "",
+        player_two: nextTwo ?? "",
+      });
+    } catch {
+      // ignore
+    }
+  }, [roomId]);
+
   const participantOptions = useMemo(
     () =>
       [{ label: "비워두기", value: "" }].concat(
@@ -585,6 +603,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               }
               return [...prev, payload.participant!];
             });
+            if (payload.participant?.user_id === user?.id) {
+              refreshRoomSnapshot();
+            }
             break;
           }
           case "participant_left": {
@@ -747,7 +768,37 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       }
     };
     return () => ws.close();
-  }, [user, wsUrl, mutate, router, participantLabel, playTone, triggerPreCountdown]);
+  }, [user, wsUrl, mutate, refreshRoomSnapshot, router, participantLabel, playTone, triggerPreCountdown]);
+
+  useEffect(() => {
+    if (!user?.id || !room.code) return;
+    if (participantState.some((p) => p.user_id === user.id)) {
+      joinStateRef.current = { joined: true, userId: user.id };
+      return;
+    }
+    if (joinStateRef.current.joined && joinStateRef.current.userId === user.id) {
+      return;
+    }
+    let cancelled = false;
+    const attemptJoin = async () => {
+      joinStateRef.current = { joined: true, userId: user.id };
+      try {
+        await api.post("/rooms/join", {
+          code: room.code,
+          team_label: null,
+        });
+        await refreshRoomSnapshot();
+      } catch (err: any) {
+        if (cancelled) return;
+        joinStateRef.current = { joined: false, userId: user.id };
+        setStatusError(err?.response?.data?.detail ?? "방 참가에 실패했습니다.");
+      }
+    };
+    attemptJoin();
+    return () => {
+      cancelled = true;
+    };
+  }, [participantState, refreshRoomSnapshot, room.code, user?.id]);
 
   useEffect(() => {
     if (remaining === null) {
