@@ -42,11 +42,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const [playerOne, setPlayerOne] = useState<string | undefined>(room.player_one_id ?? undefined);
   const [playerTwo, setPlayerTwo] = useState<string | undefined>(room.player_two_id ?? undefined);
   const [participantList, setParticipantList] = useState<Participant[]>(participants);
-  const [assigningSlot, setAssigningSlot] = useState<"player_one" | "player_two" | null>(null);
-  const [selectedPlayers, setSelectedPlayers] = useState({
-    player_one: room.player_one_id ?? "",
-    player_two: room.player_two_id ?? "",
-  });
   const joinStateRef = useRef<{ userId?: string; joined: boolean }>({ joined: false });
 
   const { user } = useAuth();
@@ -60,10 +55,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   useEffect(() => {
     setPlayerOne(room.player_one_id ?? undefined);
     setPlayerTwo(room.player_two_id ?? undefined);
-    setSelectedPlayers({
-      player_one: room.player_one_id ?? "",
-      player_two: room.player_two_id ?? "",
-    });
   }, [room.player_one_id, room.player_two_id]);
 
   useEffect(() => {
@@ -180,40 +171,11 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
     }
   };
 
-  const handleAssign = async (slot: "player_one" | "player_two", userId: string) => {
-    setAssigningSlot(slot);
-    setError(null);
-    try {
-      await api.post(`/rooms/${roomId}/players`, {
-        slot,
-        user_id: userId || null,
-      });
-      setSuccess("플레이어 구성을 업데이트했습니다.");
-    } catch (err: any) {
-      setError(err?.response?.data?.detail ?? "플레이어를 지정하지 못했습니다.");
-    } finally {
-      setAssigningSlot(null);
-    }
-  };
-
   const displayName = (participant?: Participant, fallbackId?: string) => {
     if (participant?.username) return participant.username;
     if (participant?.user_id) return `참가자 ${participant.user_id.slice(0, 6)}…`;
     if (fallbackId) return `참가자 ${fallbackId.slice(0, 6)}…`;
     return "비어 있음";
-  };
-
-  const options = [{ label: "비워두기", value: "" }].concat(
-    participantList.map((p) => ({
-      label: displayName(p),
-      value: p.user_id,
-    })),
-  );
-
-  const playerLabel = (userId?: string) => {
-    if (!userId) return "비어 있음";
-    const participant = participantList.find((p) => p.user_id === userId);
-    return displayName(participant, userId);
   };
 
   const participantItems = participantList.map((participant) => {
@@ -266,25 +228,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
 
   return (
     <div className="space-y-5 text-sm text-night-200">
-      <div className="rounded-3xl border border-night-800/80 bg-[#080f1f]/80 p-5 shadow-[0_25px_50px_rgba(0,0,0,0.55)]">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-[10px] uppercase tracking-[0.4em] text-night-500">참가 코드</p>
-            <p className="text-3xl font-black tracking-[0.35em] text-emerald-300">{roomCode}</p>
-            <p className="text-xs text-night-500">
-              참가자 {participantItems.length}명 · 관전자 {spectatorCount}명
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-night-500">방 상태</p>
-            <span className={`inline-flex rounded-full border px-4 py-1 text-xs font-semibold ${statusBadgeClass}`}>
-              {statusLabel}
-            </span>
-            <p className="mt-1 text-xs text-night-500">현재 라운드 {roundNumber}</p>
-          </div>
-        </div>
-      </div>
-
       <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
         <div className="grid gap-5">
           <div className="rounded-2xl border border-night-800 bg-[radial-gradient(circle_at_top,#202f55,#060b18)] p-4">
@@ -325,78 +268,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
               <p className="text-lg font-semibold text-white">{problemCount}개</p>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-white">플레이어 슬롯</p>
-          <div className="flex items-center gap-2 text-xs text-night-500">
-            {isHost ? "방장 전용" : "관전자 모드"}
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await api.delete(`/rooms/${roomId}/participants/me`);
-                  router.push("/rooms");
-                } catch (err: any) {
-                  setError(err?.response?.data?.detail ?? "방 나가기에 실패했습니다.");
-                }
-              }}
-              className="rounded-md border border-night-700 px-3 py-1 text-night-200 transition hover:border-red-500 hover:text-red-300"
-            >
-              방 나가기
-            </button>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3">
-          {["player_one", "player_two"].map((slot) => {
-            const isPlayerOne = slot === "player_one";
-            const assigned = isPlayerOne ? playerOne : playerTwo;
-            return (
-              <div
-                key={slot}
-                className="rounded-2xl border border-night-900/70 bg-night-950/50 p-3 text-night-200"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[12px] uppercase tracking-[0.3em] text-night-500">
-                      {isPlayerOne ? "slot a" : "slot b"}
-                    </p>
-                    <p className="text-xl font-semibold text-white">{playerLabel(assigned)}</p>
-                  </div>
-                  {isHost && (
-                    <div className="text-[10px] text-night-500">
-                      {assigningSlot === slot ? "지정 중..." : isPlayerOne ? "플레이어 1" : "플레이어 2"}
-                    </div>
-                  )}
-                </div>
-                {isHost && (
-                  <div className="mt-3">
-                    <select
-                      value={selectedPlayers[slot as "player_one" | "player_two"]}
-                      disabled={assigningSlot === slot}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSelectedPlayers((prev) => ({
-                          ...prev,
-                          [slot]: value,
-                        }));
-                        handleAssign(slot as "player_one" | "player_two", value);
-                      }}
-                      className="w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
-                    >
-                      {options.map((option) => (
-                        <option key={`${slot}-${option.value || "none"}`} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-            );
-          })}
         </div>
       </div>
 

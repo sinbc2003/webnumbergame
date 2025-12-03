@@ -46,12 +46,7 @@ export default async function RoomDetailPage({ params }: { params: { roomId: str
   const roundLabel = room.round_type === "round1_individual" ? "1라운드 개인전" : "2라운드 팀전";
 
   return (
-    <TopNav
-      layout="focus"
-      pageTitle={`Room · ${room.name}`}
-      description={`방 코드 ${room.code} · ${roundLabel} · 현재 ${participants.length}명`}
-      showChat={false}
-    >
+    <TopNav layout="focus" showChat={false} hideFocusHeader>
       <main className="mx-auto max-w-6xl py-6">
         <RoomPageShell room={room} participants={participants} />
       </main>

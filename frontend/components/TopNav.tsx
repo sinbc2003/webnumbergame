@@ -34,6 +34,7 @@ interface Props {
   description?: string;
   showChat?: boolean;
   layout?: LayoutMode;
+  hideFocusHeader?: boolean;
 }
 
 const formatTime = (value: string) => {
@@ -50,6 +51,7 @@ export default function MathNetworkShell({
   description,
   showChat = true,
   layout = "lobby",
+  hideFocusHeader = false,
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -185,22 +187,24 @@ export default function MathNetworkShell({
   if (isFocus) {
     return (
       <ShellTransitionProvider value={runTransition}>
-        <div className={clsx("focus-shell", transitioning && "focus-shell--exit")}>
-          <header className="focus-shell__header">
-            <div>
-              <p className="focus-shell__title">{pageTitle}</p>
-              {description && <p className="focus-shell__desc">{description}</p>}
-            </div>
-            <button
-              type="button"
-              onClick={() => runTransition(() => router.push("/dashboard"))}
-              className="focus-shell__home"
-              disabled={transitioning}
-            >
-              홈으로
-            </button>
-          </header>
-          <main className="focus-shell__content">{children}</main>
+        <div className={clsx("focus-shell", transitioning && "focus-shell--exit", hideFocusHeader && "focus-shell--plain")}>
+          {!hideFocusHeader && (
+            <header className="focus-shell__header">
+              <div>
+                <p className="focus-shell__title">{pageTitle}</p>
+                {description && <p className="focus-shell__desc">{description}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => runTransition(() => router.push("/dashboard"))}
+                className="focus-shell__home"
+                disabled={transitioning}
+              >
+                홈으로
+              </button>
+            </header>
+          )}
+          <main className={clsx("focus-shell__content", hideFocusHeader && "focus-shell__content--plain")}>{children}</main>
         </div>
       </ShellTransitionProvider>
     );
