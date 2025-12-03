@@ -58,10 +58,18 @@ class ConnectionManager:
 
     @property
     def lobby_roster(self) -> list[dict[str, str]]:
-        return [
-            {"user_id": data.get("user_id", ""), "username": data.get("username", "Guest")}
-            for data in self.lobby_connections.values()
-        ]
+        deduped: list[dict[str, str]] = []
+        seen: set[str] = set()
+        # iterate in reverse so the most recent connection for a user wins
+        for data in reversed(list(self.lobby_connections.values())):
+            user_id = data.get("user_id", "")
+            username = data.get("username", "Guest")
+            if not user_id or user_id in seen:
+                continue
+            seen.add(user_id)
+            deduped.append({"user_id": user_id, "username": username})
+        deduped.reverse()
+        return deduped
 
 
 manager = ConnectionManager()
