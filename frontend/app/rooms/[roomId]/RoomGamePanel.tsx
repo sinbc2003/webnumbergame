@@ -1117,6 +1117,43 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   }
 
   if (!hasActiveMatch) {
+    const slotCardNodes = (["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => {
+      const boardSlot: BoardSlot = slot === "player_one" ? "playerOne" : "playerTwo";
+      const assignedUser = boardSlot === "playerOne" ? playerOne : playerTwo;
+      const assignedParticipant = participantState.find((participant) => participant.user_id === assignedUser);
+      const order = participantOrder(assignedUser);
+      return (
+        <div key={`slot-${slot}`} className="rounded-2xl border border-night-800/70 bg-night-950/60 p-4 text-sm text-night-200">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">{slot === "player_one" ? "SLOT A" : "SLOT B"}</p>
+              <p className="text-xl font-semibold text-white">{participantLabel(assignedUser)}</p>
+            </div>
+            {assignedParticipant?.is_ready && (
+              <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-night-500">{order ? `입장 #${order}` : "아직 지정되지 않았습니다."}</p>
+          {isHost ? (
+            <select
+              value={slotSelections[slot]}
+              disabled={assigningSlot === slot}
+              onChange={(event) => handleAssignSlot(slot, event.target.value)}
+              className="mt-3 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+            >
+              {participantOptions.map((option) => (
+                <option key={`${slot}-${option.value || "empty"}`} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="mt-3 rounded-lg border border-night-800/60 bg-night-900/50 px-3 py-2 text-xs text-night-400">방장이 순서를 조정할 수 있습니다.</p>
+          )}
+        </div>
+      );
+    });
+
     return (
       <div className={lobbyShellClass}>
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
@@ -1137,7 +1174,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         </div>
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
         <div className="mt-3 flex flex-1 flex-col gap-4 overflow-hidden">
-          {renderScoreboardPanel("w-full")}
           <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-4 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1148,47 +1184,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 {isHost ? "HOST CONTROL" : "관전자 모드"}
               </span>
             </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              {(["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => {
-                const boardSlot: BoardSlot = slot === "player_one" ? "playerOne" : "playerTwo";
-                const assignedUser = boardSlot === "playerOne" ? playerOne : playerTwo;
-                const assignedParticipant = participantState.find((participant) => participant.user_id === assignedUser);
-                const order = participantOrder(assignedUser);
-                return (
-                  <div key={slot} className="rounded-2xl border border-night-800/70 bg-night-950/60 p-4 text-sm text-night-200">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">
-                          {slot === "player_one" ? "SLOT A" : "SLOT B"}
-                        </p>
-                        <p className="text-xl font-semibold text-white">{participantLabel(assignedUser)}</p>
-                      </div>
-                      {assignedParticipant?.is_ready && (
-                        <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-[11px] text-night-500">{order ? `입장 #${order}` : "아직 지정되지 않았습니다."}</p>
-                    {isHost ? (
-                      <select
-                        value={slotSelections[slot]}
-                        disabled={assigningSlot === slot}
-                        onChange={(event) => handleAssignSlot(slot, event.target.value)}
-                        className="mt-3 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
-                      >
-                        {participantOptions.map((option) => (
-                          <option key={`${slot}-${option.value || "empty"}`} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <p className="mt-3 rounded-lg border border-night-800/60 bg-night-900/50 px-3 py-2 text-xs text-night-400">
-                        방장이 순서를 조정할 수 있습니다.
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="mt-3 flex flex-col gap-3 md:grid md:grid-cols-[1fr_auto_1fr] md:items-stretch">
+              {slotCardNodes[0]}
+              <div className="flex items-center justify-center rounded-2xl border border-night-800/50 bg-night-950/40 p-4 text-xs font-semibold tracking-[0.45em] text-night-500">
+                VS
+              </div>
+              {slotCardNodes[1]}
             </div>
           </div>
 
