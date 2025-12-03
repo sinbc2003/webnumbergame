@@ -536,9 +536,15 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const handleLeaveRoom = useCallback(async () => {
     if (leaving) return;
 
-    const confirmed =
-      typeof window === "undefined" ? true : window.confirm("방을 나가시겠습니까? 진행 중이면 기권 처리됩니다.");
-    if (!confirmed) {
+    let allowLeave = true;
+    if (typeof window !== "undefined") {
+      if (hasActiveMatch) {
+        allowLeave = window.confirm("라운드가 진행 중입니다. 지금 나가면 기권 처리됩니다. 나가시겠습니까?");
+      } else if (isHost) {
+        allowLeave = window.confirm("방장이 나가면 방이 종료됩니다. 나가시겠습니까?");
+      }
+    }
+    if (!allowLeave) {
       return;
     }
 
@@ -563,7 +569,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     } finally {
       setLeaving(false);
     }
-  }, [leaving, roomId, router, user]);
+  }, [hasActiveMatch, isHost, leaving, roomId, router, user]);
 
   const renderLeaveButton = () => (
     <button
