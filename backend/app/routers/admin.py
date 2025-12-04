@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..database import get_session
 from ..dependencies import get_admin_user
 from ..enums import RoundType
-from ..events.manager import manager
+from ..events.manager import manager 
 from ..models import (
     Match,
     Problem,
