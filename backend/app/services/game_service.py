@@ -61,7 +61,12 @@ class GameService:
         statement = (
             select(Submission)
             .where(Submission.match_id == match_id)
-            .order_by(distance_nulls_last, Submission.distance, Submission.submitted_at, Submission.cost)
+            .order_by(
+                distance_nulls_last,
+                Submission.distance,
+                Submission.cost,
+                Submission.submitted_at,
+            )
         )
         result = await self.session.execute(statement)
         return result.scalars().first()

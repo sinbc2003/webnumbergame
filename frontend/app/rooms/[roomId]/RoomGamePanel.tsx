@@ -81,9 +81,9 @@ type RoomEventPayload = {
 
 interface HistoryEntry {
   expression: string;
-  score: number;
-  value: number | null;
+  operatorCount: number;
   timestamp: string;
+  submittedAt: string;
   isOptimal?: boolean;
   metTarget?: boolean;
 }
@@ -111,8 +111,9 @@ interface RoomChatMessage {
 type RoundOutcome = {
   reason: string;
   winnerId?: string | null;
-  distance?: number | null;
-  score?: number | null;
+  operatorCount?: number | null;
+  submittedAt?: string | null;
+  isOptimal?: boolean;
 };
 
 interface MatchSummary {
@@ -121,7 +122,8 @@ interface MatchSummary {
   winnerId: string | null;
   winnerLabel: string;
   winnerExpression?: string | null;
-  winnerScore?: number | null;
+  winnerOperatorCount?: number | null;
+  winnerSubmittedAt?: string | null;
   targetNumber?: number | null;
   totalProblems?: number | null;
   optimalCost?: number | null;
@@ -325,6 +327,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const [scoreboard, setScoreboard] = useState<{ playerOne: number; playerTwo: number }>({
     playerOne: 0,
     playerTwo: 0,
+  });
+  const [latestCostBySlot, setLatestCostBySlot] = useState<{ playerOne: number | null; playerTwo: number | null }>({
+    playerOne: null,
+    playerTwo: null,
   });
   const [lastWinnerLabel, setLastWinnerLabel] = useState<string | null>(null);
   const [lastWinReason, setLastWinReason] = useState<string | null>(null);
@@ -893,8 +899,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       setRoundOutcome({
         reason,
         winnerId,
-        distance: winnerSubmission?.distance ?? null,
-        score: winnerSubmission?.score ?? null,
+        operatorCount: typeof winnerSubmission?.cost === "number" ? winnerSubmission.cost : null,
+        submittedAt: winnerSubmission?.submitted_at ?? null,
+        isOptimal: Boolean(winnerSubmission?.is_optimal),
       });
       setPreCountdown(null);
       setInitialRemaining(null);
@@ -908,7 +915,13 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         const winnerLabel = participantLabel(winnerId);
         setLastWinnerLabel(winnerLabel);
         const reasonLabel =
-          reason === "timeout" ? "시간 종료 판정" : reason === "forfeit" ? "기권승" : "정답 제출";
+          reason === "timeout"
+            ? "시간 종료 판정"
+            : reason === "forfeit"
+              ? "기권승"
+              : reason === "optimal"
+                ? "최적 연산기호 달성"
+                : "최종 판정";
         setLastWinReason(reasonLabel);
         if (winnerId === playerIdsRef.current.playerOne) {
           setScoreboard((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
@@ -916,22 +929,28 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           setScoreboard((prev) => ({ ...prev, playerTwo: prev.playerTwo + 1 }));
         }
         if (winnerId === user?.id) {
+          const operatorCopy =
+            typeof winnerSubmission?.cost === "number" ? `${winnerSubmission.cost}개 연산기호로 ` : "";
           const message =
             reason === "timeout"
-              ? "시간 종료! 근사 정답으로 승리했습니다."
+              ? `${operatorCopy}시간 종료! 가장 효율적으로 승리했습니다.`
               : reason === "forfeit"
                 ? "상대가 나가 기권승으로 처리되었습니다."
-                : "정답으로 승리했습니다!";
-          setStatusMessage(message);
+                : `${operatorCopy}승리했습니다!`;
+          setStatusMessage(message.trim());
           setStatusError(null);
           playTone("success");
         } else {
+          const operatorCopy =
+            typeof winnerSubmission?.cost === "number"
+              ? `${winnerSubmission.cost}개 연산기호`
+              : "더 적은 연산기호";
           const message =
             reason === "timeout"
-              ? `${winnerLabel} 님이 더 가까운 해답을 제출했습니다.`
+              ? `${winnerLabel} 님이 ${operatorCopy}로 시간을 지배했습니다.`
               : reason === "forfeit"
                 ? `${winnerLabel} 님이 남아 있어 승리했습니다.`
-                : `${winnerLabel} 님이 정답을 찾아 라운드가 종료되었습니다.`;
+                : `${winnerLabel} 님이 ${operatorCopy}로 판정을 가져갔습니다.`;
           setStatusError(message);
           setStatusMessage(null);
           playTone("error");
@@ -1015,6 +1034,14 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             if (!payload.submission) break;
             const slot = slotFromUserId(payload.submission.user_id);
             if (slot) {
+              const submissionCost =
+                typeof payload.submission.cost === "number"
+                  ? payload.submission.cost
+                  : countOperators(payload.submission.expression);
+              setLatestCostBySlot((prev) => ({
+                ...prev,
+                [slot]: submissionCost,
+              }));
               setBoards((prev) => {
                 const metTarget =
                   payload.submission!.distance === 0 ||
@@ -1023,9 +1050,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                       payload.submission!.result_value);
                 const entry: HistoryEntry = {
                   expression: payload.submission!.expression,
-                  score: payload.submission!.score,
-                  value: payload.submission!.result_value ?? null,
+                  operatorCount: submissionCost,
                   timestamp: new Date().toISOString(),
+                  submittedAt: payload.submission!.submitted_at ?? new Date().toISOString(),
                   isOptimal: Boolean(payload.submission!.is_optimal),
                   metTarget,
                 };
@@ -1041,11 +1068,15 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             }
             if (payload.submission.user_id && payload.submission.user_id === user?.id) {
               if (payload.submission.distance === 0) {
-                setStatusMessage("정답입니다! 다음 문제를 기다려 주세요.");
+                const submissionCost =
+                  typeof payload.submission.cost === "number"
+                    ? payload.submission.cost
+                    : countOperators(payload.submission.expression);
+                setStatusMessage(`목표 달성! 연산기호 ${submissionCost}개로 기록했습니다.`);
                 setStatusError(null);
                 playTone("success");
               } else if (typeof payload.submission.distance === "number") {
-                setStatusError(`목표까지 ${payload.submission.distance}만큼 차이납니다.`);
+                setStatusError("아직 목표값에 도달하지 못했습니다. 조금만 더 조정해 보세요.");
                 playTone("error");
               }
             }
@@ -1056,6 +1087,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               playerOne: createBoardState(),
               playerTwo: createBoardState(),
             });
+            setLatestCostBySlot({ playerOne: null, playerTwo: null });
             setScoreboard({ playerOne: 0, playerTwo: 0 });
             setLastWinnerLabel(null);
             setLastWinReason(null);
@@ -1072,6 +1104,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           case "problem_advanced": {
             setStatusMessage("다음 문제로 이동했습니다.");
             lastProblemSnapshotRef.current = null;
+            setLatestCostBySlot({ playerOne: null, playerTwo: null });
             mutate();
             break;
           }
@@ -1119,8 +1152,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               prev ?? {
                 reason,
                 winnerId,
-                distance: winnerSubmission?.distance ?? null,
-                score: winnerSubmission?.score ?? null,
+                operatorCount:
+                  typeof winnerSubmission?.cost === "number" ? winnerSubmission.cost : null,
+                submittedAt: winnerSubmission?.submitted_at ?? null,
+                isOptimal: Boolean(winnerSubmission?.is_optimal),
               },
             );
             setMatchSummary({
@@ -1129,7 +1164,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               winnerId,
               winnerLabel,
               winnerExpression: winnerSubmission?.expression ?? null,
-              winnerScore: winnerSubmission?.score ?? null,
+              winnerOperatorCount:
+                typeof winnerSubmission?.cost === "number" ? winnerSubmission.cost : null,
+              winnerSubmittedAt: winnerSubmission?.submitted_at ?? null,
               targetNumber: activeSnapshot?.target_number ?? payload.target_number ?? null,
               totalProblems: payload.total_problems ?? activeSnapshot?.total_problems ?? null,
               optimalCost: activeSnapshot?.optimal_cost ?? payload.optimal_cost ?? null,
@@ -1169,7 +1206,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 winnerId: null,
                 winnerLabel: "경기가 종료되었습니다.",
                 winnerExpression: null,
-                winnerScore: null,
+                winnerOperatorCount: null,
+                winnerSubmittedAt: null,
                 targetNumber: activeMatchRef.current?.target_number ?? null,
                 totalProblems: activeMatchRef.current?.total_problems ?? null,
                 optimalCost: activeMatchRef.current?.optimal_cost ?? null,
@@ -1406,17 +1444,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const myBoard = mySlot ? boards[mySlot] : null;
   const myExpression = myBoard?.expression ?? "";
   const myHistory = myBoard?.history ?? [];
-  const allowHistory = (entry: HistoryEntry | null, matchOverride?: ActiveMatch | null) => {
+  const allowHistory = (entry: HistoryEntry | null) => {
     if (!entry) return false;
-    const match = matchOverride ?? activeMatch ?? activeMatchRef.current;
-    if (!match) return false;
-    if (entry.metTarget || entry.isOptimal) {
-      return true;
-    }
-    if (typeof entry.value === "number") {
-      return entry.value === match.target_number;
-    }
-    return false;
+    return Boolean(entry.metTarget || entry.isOptimal);
   };
   const expressionValue = useMemo(() => computeExpressionValue(myExpression), [myExpression]);
   const operatorCount = useMemo(() => countOperators(myExpression), [myExpression]);
@@ -1452,6 +1482,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
   if (isSimplifiedSoloView && activeMatch && mySlot) {
     const assignedUser = mySlot === "playerOne" ? playerOne : playerTwo;
+    const opponentCostForSolo =
+      mySlot === "playerOne" ? latestCostBySlot.playerTwo : latestCostBySlot.playerOne;
     return (
       <div className="min-h-screen bg-[#050a15] px-4 py-6 text-night-100">
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
@@ -1518,6 +1550,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               focusLayout
               emphasizeInput
               hideIdentity
+              opponentOperatorCount={opponentCostForSolo}
               textareaRefCallback={(el) => {
                 playerTextareaRefs.current[mySlot] = el;
               }}
@@ -1590,6 +1623,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             {visibleSlots.map((slot) => {
               const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
               const isMine = mySlot === slot;
+               const slotOpponentCost =
+                slot === "playerOne" ? latestCostBySlot.playerTwo : latestCostBySlot.playerOne;
               if (isTeamRound && isMine) {
                 return (
                   <TeamBoard
@@ -1604,6 +1639,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                     disabled={!activeMatch || !assignedUser}
                     playTone={playTone}
                     armAudio={armAudio}
+                    opponentOperatorCount={slotOpponentCost}
                   />
                 );
               }
@@ -1623,6 +1659,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
                   warningMessage={inputWarnings[slot]}
                   focusLayout
+                  opponentOperatorCount={slotOpponentCost}
                   textareaRefCallback={(el) => {
                     playerTextareaRefs.current[slot] = el;
                   }}
@@ -1831,15 +1868,22 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 {roundOutcome.reason === "timeout"
                   ? "시간 종료 결과"
                   : roundOutcome.reason === "forfeit"
-                    ? "기권 처리"
-                    : "직전 라운드 결과"}
+                ? "기권 처리"
+                : roundOutcome.reason === "optimal"
+                  ? "최적 연산기호 달성"
+                  : "직전 라운드 결과"}
               </p>
               <p className="mt-1">
                 승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
               </p>
-              {typeof roundOutcome.distance === "number" && (
-                <p className="text-xs text-amber-200/70">목표와의 차이 {roundOutcome.distance}</p>
-              )}
+          {typeof roundOutcome.operatorCount === "number" && (
+            <p className="text-xs text-amber-200/70">연산기호 {roundOutcome.operatorCount}개</p>
+          )}
+          {roundOutcome.submittedAt && (
+            <p className="text-[11px] text-amber-200/60">
+              제출 시각 {new Date(roundOutcome.submittedAt).toLocaleTimeString("ko-KR")}
+            </p>
+          )}
             </div>
           )}
         </div>
@@ -1869,13 +1913,20 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               ? "시간 종료 결과"
               : roundOutcome.reason === "forfeit"
                 ? "상대 기권 승리"
-                : "라운드 결과"}
+                : roundOutcome.reason === "optimal"
+                  ? "최적 연산기호 달성"
+                  : "라운드 결과"}
           </p>
           <p className="mt-1 text-night-300">
             승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
           </p>
-          {typeof roundOutcome.distance === "number" && (
-            <p className="text-xs text-night-500">목표와의 차이: {roundOutcome.distance}</p>
+          {typeof roundOutcome.operatorCount === "number" && (
+            <p className="text-xs text-night-500">연산기호 {roundOutcome.operatorCount}개</p>
+          )}
+          {roundOutcome.submittedAt && (
+            <p className="text-[11px] text-night-600">
+              제출 시각 {new Date(roundOutcome.submittedAt).toLocaleTimeString("ko-KR")}
+            </p>
           )}
         </div>
       )}
@@ -1914,6 +1965,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         {visibleSlots.map((slot) => {
           const isMine = mySlot === slot;
           const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
+          const slotOpponentCost =
+            slot === "playerOne" ? latestCostBySlot.playerTwo : latestCostBySlot.playerOne;
           return (
             <PlayerPanel
               key={slot}
@@ -1930,6 +1983,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
               warningMessage={inputWarnings[slot]}
               focusLayout={Boolean(mySlot)}
+              opponentOperatorCount={slotOpponentCost}
               textareaRefCallback={(el) => {
                 playerTextareaRefs.current[slot] = el;
               }}
@@ -1952,6 +2006,7 @@ interface TeamBoardProps {
   disabled: boolean;
   playTone: (type: "success" | "error" | "tick") => void;
   armAudio: () => void;
+  opponentOperatorCount?: number | null;
 }
 
 function TeamBoard({
@@ -1965,6 +2020,7 @@ function TeamBoard({
   disabled,
   playTone,
   armAudio,
+  opponentOperatorCount,
 }: TeamBoardProps) {
   const [members, setMembers] = useState<TeamMemberState[]>(() => createDefaultTeamMembers(teamSize));
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -2168,12 +2224,16 @@ function TeamBoard({
               {history.map((entry, index) => (
                 <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
                   <p className="font-semibold text-white">{entry.expression}</p>
-                  <p className="text-[11px] text-night-400">
-                    점수 {entry.score} | 값 {entry.value ?? "-"}
-                  </p>
+                  <p className="text-[11px] text-night-400">연산기호 {entry.operatorCount}개</p>
                 </div>
               ))}
             </div>
+          </div>
+        )}
+        {typeof opponentOperatorCount === "number" && (
+          <div className="mt-3 rounded-xl border border-indigo-500/40 bg-indigo-500/10 p-3 text-xs text-indigo-100">
+            <p className="font-semibold text-white">상대 최근 연산기호</p>
+            <p className="mt-1 text-2xl font-black text-white">{opponentOperatorCount}개</p>
           </div>
         )}
       </div>
@@ -2198,6 +2258,7 @@ interface PlayerPanelProps {
   textareaRefCallback?: (el: HTMLTextAreaElement | null) => void;
   emphasizeInput?: boolean;
   hideIdentity?: boolean;
+  opponentOperatorCount?: number | null;
 }
 
 function PlayerPanel({
@@ -2217,6 +2278,7 @@ function PlayerPanel({
   textareaRefCallback,
   emphasizeInput = false,
   hideIdentity = false,
+  opponentOperatorCount,
 }: PlayerPanelProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -2234,8 +2296,14 @@ function PlayerPanel({
       history.length === 0
         ? null
         : history.reduce<HistoryEntry | null>((best, entry) => {
-            if (!best || entry.score > best.score) {
+            if (!best) {
               return entry;
+            }
+            if (entry.operatorCount < best.operatorCount) {
+              return entry;
+            }
+            if (entry.operatorCount === best.operatorCount) {
+              return entry.submittedAt < best.submittedAt ? entry : best;
             }
             return best;
           }, null);
@@ -2298,9 +2366,7 @@ function PlayerPanel({
                   className="rounded-2xl border border-night-800/70 bg-night-900/40 p-3 text-sm text-night-200"
                 >
                   <p className="break-all font-semibold text-white">{entry.expression}</p>
-                  <p className="text-xs text-night-400">
-                    점수 {entry.score} | 값 {entry.value ?? "-"}
-                  </p>
+                  <p className="text-xs text-night-400">연산기호 {entry.operatorCount}개</p>
                 </div>
               ))}
             </div>
@@ -2309,9 +2375,14 @@ function PlayerPanel({
             <div className="mt-3 rounded-3xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100">
               <p className="font-semibold">🏆 최고 기록</p>
               <p className="mt-1 break-all font-mono text-lg text-white">{bestEntry.expression}</p>
-              <p className="text-xs text-amber-200/70">
-                점수 {bestEntry.score} | 값 {bestEntry.value ?? "-"}
-              </p>
+              <p className="text-xs text-amber-200/70">연산기호 {bestEntry.operatorCount}개</p>
+            </div>
+          )}
+          {isMine && typeof opponentOperatorCount === "number" && (
+            <div className="mt-3 rounded-3xl border border-indigo-500/40 bg-indigo-500/10 p-4 text-xs text-indigo-100">
+              <p className="font-semibold text-white">상대 최근 연산기호</p>
+              <p className="mt-1 text-2xl font-black text-white">{opponentOperatorCount}개</p>
+              <p className="text-[11px] text-indigo-200/70">이 수보다 줄이면 앞서갑니다!</p>
             </div>
           )}
         </div>
@@ -2363,11 +2434,8 @@ function PlayerPanel({
           {history.length === 0 && <p>아직 제출 기록이 없습니다.</p>}
           {history.map((entry, index) => (
             <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
-                  <p className="break-all font-semibold text-white">{entry.expression}</p>
-              <p className="break-all font-semibold text-white">{entry.expression}</p>
-              <p className="text-[11px] text-night-400">
-                점수 {entry.score} | 값 {entry.value ?? "-"}
-              </p>
+            <p className="break-all font-semibold text-white">{entry.expression}</p>
+            <p className="text-[11px] text-night-400">연산기호 {entry.operatorCount}개</p>
             </div>
           ))}
         </div>
@@ -2390,7 +2458,7 @@ const translateSummaryReason = (reason: string) => {
     case "forfeit":
       return "기권";
     case "optimal":
-      return "정답 제출";
+      return "최적 연산기호";
     default:
       return "경기 종료";
   }
@@ -2398,12 +2466,20 @@ const translateSummaryReason = (reason: string) => {
 
 const computeHistoryStats = (history: HistoryEntry[]) => {
   if (!history.length) {
-    return { attempts: 0, bestEntry: null, lastEntry: null, average: null };
+    return { attempts: 0, bestEntry: null, averageOperatorCount: null };
   }
-  const bestEntry = history.reduce((best, entry) => (best && best.score >= entry.score ? best : entry), history[0]);
-  const lastEntry = history[history.length - 1];
-  const average = Math.round(history.reduce((sum, entry) => sum + entry.score, 0) / history.length);
-  return { attempts: history.length, bestEntry, lastEntry, average };
+  const bestEntry = history.reduce((best, entry) => {
+    if (!best) return entry;
+    if (entry.operatorCount < best.operatorCount) return entry;
+    if (entry.operatorCount === best.operatorCount) {
+      return entry.submittedAt < best.submittedAt ? entry : best;
+    }
+    return best;
+  }, history[0]);
+  const averageOperatorCount = Math.round(
+    history.reduce((sum, entry) => sum + entry.operatorCount, 0) / history.length,
+  );
+  return { attempts: history.length, bestEntry, averageOperatorCount };
 };
 
 function MatchSummaryCard({ summary, roomClosedReason, onClose, onReturn }: MatchSummaryCardProps) {
@@ -2470,8 +2546,13 @@ function MatchSummaryCard({ summary, roomClosedReason, onClose, onReturn }: Matc
         <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-50">
           <p className="text-xs uppercase tracking-[0.3em] text-amber-200/80">Winner Expression</p>
           <p className="mt-2 font-mono text-lg text-white">{summary.winnerExpression}</p>
-          {summary.winnerScore !== null && (
-            <p className="text-xs text-amber-200/80">점수 {summary.winnerScore}</p>
+          {typeof summary.winnerOperatorCount === "number" && (
+            <p className="text-xs text-amber-200/80">연산기호 {summary.winnerOperatorCount}개</p>
+          )}
+          {summary.winnerSubmittedAt && (
+            <p className="text-[11px] text-amber-200/60">
+              제출 시각 {new Date(summary.winnerSubmittedAt).toLocaleTimeString("ko-KR")}
+            </p>
           )}
         </div>
       )}
@@ -2486,17 +2567,17 @@ function MatchSummaryCard({ summary, roomClosedReason, onClose, onReturn }: Matc
               </div>
               {stats.bestEntry ? (
                 <div className="mt-3 rounded-xl border border-night-800/60 bg-night-950/40 p-3 text-xs">
-                  <p className="text-night-400">최고 점수</p>
+                  <p className="text-night-400">최소 연산기호</p>
                   <p className="mt-1 font-mono text-base text-white">{stats.bestEntry.expression}</p>
-                  <p className="text-[11px] text-night-500">
-                    점수 {stats.bestEntry.score} | 값 {stats.bestEntry.value ?? "-"}
-                  </p>
+                  <p className="text-[11px] text-night-500">연산기호 {stats.bestEntry.operatorCount}개</p>
                 </div>
               ) : (
                 <p className="mt-3 text-xs text-night-500">기록이 없습니다.</p>
               )}
-              {stats.average !== null && (
-                <p className="mt-2 text-xs text-night-400">평균 점수 {stats.average}</p>
+              {typeof stats.averageOperatorCount === "number" && (
+                <p className="mt-2 text-xs text-night-400">
+                  평균 연산기호 {stats.averageOperatorCount}개
+                </p>
               )}
               <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-1 text-xs">
                 {player.history.length === 0 && (
@@ -2511,9 +2592,7 @@ function MatchSummaryCard({ summary, roomClosedReason, onClose, onReturn }: Matc
                       className="rounded-lg border border-night-800/60 bg-night-950/30 p-2"
                     >
                       <p className="font-semibold text-white">{entry.expression}</p>
-                      <p className="text-[11px] text-night-500">
-                        점수 {entry.score} | 값 {entry.value ?? "-"}
-                      </p>
+                      <p className="text-[11px] text-night-500">연산기호 {entry.operatorCount}개</p>
                     </div>
                   ))}
               </div>
