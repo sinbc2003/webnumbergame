@@ -276,6 +276,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const boardsRef = useRef<{ playerOne: BoardState; playerTwo: BoardState }>(boards);
   const [pendingInput, setPendingInput] = useState<{ slot: BoardSlot; value: string } | null>(null);
   const [submittingSlot, setSubmittingSlot] = useState<BoardSlot | null>(null);
+  const playerTextareaRefs = useRef<Record<BoardSlot, HTMLTextAreaElement | null>>({
+    playerOne: null,
+    playerTwo: null,
+  });
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -936,18 +940,18 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             const slot = slotFromUserId(payload.submission.user_id);
             if (slot) {
               setBoards((prev) => {
+                const metTarget =
+                  payload.submission!.distance === 0 ||
+                  (typeof payload.submission!.result_value === "number" &&
+                    (activeMatchRef.current?.target_number ?? activeMatch?.target_number) ===
+                      payload.submission!.result_value);
                 const entry: HistoryEntry = {
                   expression: payload.submission!.expression,
                   score: payload.submission!.score,
                   value: payload.submission!.result_value ?? null,
                   timestamp: new Date().toISOString(),
                   isOptimal: Boolean(payload.submission!.is_optimal),
-                  metTarget:
-                    typeof payload.submission!.result_value === "number" &&
-                    Boolean(
-                      (activeMatchRef.current?.target_number ?? activeMatch?.target_number) ===
-                        payload.submission!.result_value,
-                    ),
+                  metTarget,
                 };
                 const shouldRecord = allowHistory(entry);
                 const nextHistory: HistoryEntry[] = shouldRecord
@@ -1316,6 +1320,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       playTone("error");
     } finally {
       setSubmittingSlot(null);
+      requestAnimationFrame(() => {
+        playerTextareaRefs.current[slot]?.focus();
+      });
     }
   };
 
@@ -1358,6 +1365,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       ? Math.max(0, Math.min(1, remaining / initialRemaining))
       : 0;
   const isCountdownCritical = remaining !== null && remaining <= CRITICAL_COUNTDOWN_THRESHOLD;
+  useEffect(() => {
+    if (!isPlayerView || !mySlot) return;
+    requestAnimationFrame(() => {
+      playerTextareaRefs.current[mySlot]?.focus();
+    });
+  }, [isPlayerView, mySlot]);
   const problemIndicators = activeMatch
     ? Array.from({ length: activeMatch.total_problems }, (_, index) => {
         if (index < activeMatch.current_index) return "done";
@@ -1433,7 +1446,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                         key={`${entry.timestamp}-${index}`}
                         className="flex items-center justify-between border-b border-night-900/40 py-2 last:border-none"
                       >
-                        <span className="font-mono text-sm text-white">{entry.expression}</span>
+                        <span className="break-all font-mono text-sm text-white">{entry.expression}</span>
                         <span className="text-night-400">{entry.score}점</span>
                       </div>
                     ))
@@ -1459,6 +1472,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               placeholder="예: (1+1)*1"
               warningMessage={inputWarnings[mySlot]}
               focusLayout
+              textareaRefCallback={(el) => {
+                playerTextareaRefs.current[mySlot] = el;
+              }}
             />
           </div>
 
@@ -1566,6 +1582,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
                   warningMessage={inputWarnings[slot]}
                   focusLayout
+                  textareaRefCallback={(el) => {
+                    playerTextareaRefs.current[slot] = el;
+                  }}
                 />
               );
             })}
@@ -1736,7 +1755,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                     <span className="font-semibold text-white">{message.username}</span>
                     <span>{formatChatTime(message.timestamp)}</span>
                   </div>
-                  <p className="whitespace-pre-wrap break-words text-night-100">{message.message}</p>
+                  <p className="whitespace-pre-wrap break-all text-night-100">{message.message}</p>
                 </div>
               ))}
             </div>
@@ -1868,6 +1887,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
               warningMessage={inputWarnings[slot]}
               focusLayout={Boolean(mySlot)}
+              textareaRefCallback={(el) => {
+                playerTextareaRefs.current[slot] = el;
+              }}
             />
           );
         })}
@@ -2030,7 +2052,7 @@ function TeamBoard({
       </div>
       <div className="mt-5 rounded-xl border border-night-800 bg-night-900/50 p-4 font-mono text-xl text-white">
         <p className="text-xs text-night-500">현재 식</p>
-        <p className="mt-2 min-h-[64px] break-words text-2xl">{expression || "입력을 시작하세요."}</p>
+        <p className="mt-2 min-h-[64px] break-all text-2xl">{expression || "입력을 시작하세요."}</p>
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-[2fr,1fr]">
         <div>
@@ -2130,6 +2152,7 @@ interface PlayerPanelProps {
   placeholder?: string;
   warningMessage?: string | null;
   focusLayout?: boolean;
+  textareaRefCallback?: (el: HTMLTextAreaElement | null) => void;
 }
 
 function PlayerPanel({
@@ -2146,6 +2169,7 @@ function PlayerPanel({
   placeholder,
   warningMessage,
   focusLayout,
+  textareaRefCallback,
 }: PlayerPanelProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -2191,6 +2215,7 @@ function PlayerPanel({
             disabled={!isMine || disabled || submitting}
             spellCheck={false}
             autoComplete="off"
+            ref={textareaRefCallback}
             className="mt-6 min-h-[160px] w-full flex-1 rounded-2xl border-2 border-indigo-500/40 bg-night-900 px-4 py-4 font-mono text-2xl text-white focus:border-indigo-300 focus:outline-none"
           />
           {warningMessage && <p className="mt-2 text-sm text-amber-200/90">{warningMessage}</p>}
@@ -2216,7 +2241,7 @@ function PlayerPanel({
                   key={`${entry.timestamp}-${index}`}
                   className="rounded-2xl border border-night-800/70 bg-night-900/40 p-3 text-sm text-night-200"
                 >
-                  <p className="font-semibold text-white">{entry.expression}</p>
+                  <p className="break-all font-semibold text-white">{entry.expression}</p>
                   <p className="text-xs text-night-400">
                     점수 {entry.score} | 값 {entry.value ?? "-"}
                   </p>
@@ -2227,7 +2252,7 @@ function PlayerPanel({
           {bestEntry && (
             <div className="mt-3 rounded-3xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100">
               <p className="font-semibold">🏆 최고 기록</p>
-              <p className="mt-1 font-mono text-lg text-white">{bestEntry.expression}</p>
+              <p className="mt-1 break-all font-mono text-lg text-white">{bestEntry.expression}</p>
               <p className="text-xs text-amber-200/70">
                 점수 {bestEntry.score} | 값 {bestEntry.value ?? "-"}
               </p>
@@ -2257,7 +2282,8 @@ function PlayerPanel({
         disabled={!isMine || disabled || submitting}
         spellCheck={false}
         autoComplete="off"
-        className="mt-3 h-24 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+        ref={textareaRefCallback}
+        className="mt-3 h-24 w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 font-mono text-white focus:border-indigo-500 focus:outline-none"
       />
 
       {warningMessage && <p className="mt-1 text-xs text-amber-200">{warningMessage}</p>}
@@ -2281,7 +2307,8 @@ function PlayerPanel({
           {history.length === 0 && <p>아직 제출 기록이 없습니다.</p>}
           {history.map((entry, index) => (
             <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
-              <p className="font-semibold text-white">{entry.expression}</p>
+                  <p className="break-all font-semibold text-white">{entry.expression}</p>
+              <p className="break-all font-semibold text-white">{entry.expression}</p>
               <p className="text-[11px] text-night-400">
                 점수 {entry.score} | 값 {entry.value ?? "-"}
               </p>
