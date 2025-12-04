@@ -2006,12 +2006,16 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         </div>
       )}
 
-      <div className="grid gap-3 rounded-lg border border-night-800/60 bg-night-950/40 p-4 text-sm text-night-200 sm:grid-cols-2">
-        <div>
+      <div className="flex flex-wrap items-stretch gap-4 rounded-lg border border-night-800/60 bg-night-950/40 p-4 text-sm text-night-200">
+        <div className="flex min-w-[150px] flex-col">
           <p className="text-night-500">현재 문제</p>
-          <p className="text-2xl font-bold text-white">{activeMatch?.target_number ?? "-"}</p>
+          <p className="text-2xl font-bold text-emerald-300">{activeMatch?.target_number ?? "-"}</p>
         </div>
-        <div>
+        <div className="flex min-w-[150px] flex-col">
+          <p className="text-night-500">최적 코스트</p>
+          <p className="text-xl font-semibold text-amber-300">{activeMatch?.optimal_cost ?? "-"}</p>
+        </div>
+        <div className="flex min-w-[180px] flex-1 flex-col">
           <p className="text-night-500">남은 시간</p>
           <p className={`text-3xl font-bold ${isCountdownCritical ? "text-red-400" : "text-indigo-300"}`}>
             {formattedRemaining}
@@ -2023,11 +2027,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             />
           </div>
         </div>
-        <div>
-          <p className="text-night-500">최적 코스트</p>
-          <p className="text-xl font-semibold text-night-100">{activeMatch?.optimal_cost ?? "-"}</p>
-        </div>
-        <div>
+        <div className="flex min-w-[150px] flex-col">
           <p className="text-night-500">문제 진행도</p>
           <p className="text-xl font-semibold text-night-100">
             {activeMatch ? `${activeMatch.current_index + 1} / ${activeMatch.total_problems}` : "-"}
