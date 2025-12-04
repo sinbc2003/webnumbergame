@@ -14,6 +14,8 @@ type SizeOption = {
   label: string;
   teamSize: number;
   hint: string;
+  disabled?: boolean;
+  comingSoon?: string;
 };
 
 type ModeOption = {
@@ -38,8 +40,22 @@ const MODE_OPTIONS: ModeOption[] = [
     accent: "emerald",
     sizes: [
       { id: "solo-1v1", label: "1 vs 1", teamSize: 1, hint: "표준 래더" },
-      { id: "solo-2v2", label: "2 vs 2", teamSize: 2, hint: "릴레이 팀전" },
-      { id: "solo-3v3", label: "3 vs 3", teamSize: 3, hint: "릴레이 팀전" },
+      {
+        id: "solo-2v2",
+        label: "2 vs 2",
+        teamSize: 2,
+        hint: "릴레이 팀전",
+        disabled: true,
+        comingSoon: "곧 개발 예정",
+      },
+      {
+        id: "solo-3v3",
+        label: "3 vs 3",
+        teamSize: 3,
+        hint: "릴레이 팀전",
+        disabled: true,
+        comingSoon: "곧 개발 예정",
+      },
     ],
   },
   {
@@ -51,8 +67,22 @@ const MODE_OPTIONS: ModeOption[] = [
     mode: "team",
     accent: "indigo",
     sizes: [
-      { id: "team-2v2", label: "2 vs 2", teamSize: 2, hint: "코스트 분배 협동" },
-      { id: "team-4v4", label: "4 vs 4", teamSize: 4, hint: "풀 로스터" },
+      {
+        id: "team-2v2",
+        label: "2 vs 2",
+        teamSize: 2,
+        hint: "코스트 분배 협동",
+        disabled: true,
+        comingSoon: "곧 개발 예정",
+      },
+      {
+        id: "team-4v4",
+        label: "4 vs 4",
+        teamSize: 4,
+        hint: "풀 로스터",
+        disabled: true,
+        comingSoon: "곧 개발 예정",
+      },
     ],
   },
   {
@@ -86,10 +116,10 @@ export default function RoomCreateBoard({ onCreated }: Props) {
       return;
     }
     setSize((prev) => {
-      if (prev && mode.sizes?.some((item) => item.id === prev.id)) {
+      if (prev && !prev.disabled && mode.sizes?.some((item) => item.id === prev.id && !item.disabled)) {
         return prev;
       }
-      return mode.sizes?.[0] ?? null;
+      return mode.sizes?.find((item) => !item.disabled) ?? null;
     });
   }, [mode]);
 
@@ -160,11 +190,22 @@ export default function RoomCreateBoard({ onCreated }: Props) {
                 <button
                   key={option.id}
                   type="button"
-                  onClick={() => setSize(option)}
-                  className={clsx("size-chip", option.id === size?.id && "size-chip--active")}
+                  onClick={() => {
+                    if (option.disabled) return;
+                    setSize(option);
+                  }}
+                  disabled={option.disabled}
+                  className={clsx(
+                    "size-chip",
+                    option.id === size?.id && "size-chip--active",
+                    option.disabled && "size-chip--disabled",
+                  )}
+                  title={option.disabled ? option.comingSoon ?? "곧 개발 예정" : undefined}
                 >
                   <span>{option.label}</span>
-                  <span className="size-chip__meta">{option.hint}</span>
+                  <span className="size-chip__meta">
+                    {option.disabled ? option.comingSoon ?? "곧 개발 예정" : option.hint}
+                  </span>
                 </button>
               ))}
             </div>
