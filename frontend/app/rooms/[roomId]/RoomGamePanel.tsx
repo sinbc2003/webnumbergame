@@ -801,7 +801,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
   const handleAssignSlot = useCallback(
     async (slot: PlayerAssignmentSlot, userId: string) => {
-      if (!isHost) return;
+      if (!isHost || isRelayRoom) return;
       setAssigningSlot(slot);
       setStatusError(null);
       setSlotSelections((prev) => ({
@@ -825,7 +825,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         setAssigningSlot(null);
       }
     },
-    [isHost, mutate, playerOne, playerTwo, roomId],
+    [isHost, isRelayRoom, mutate, playerOne, playerTwo, roomId],
   );
 
   const handleRelaySlotChange = useCallback(
@@ -1494,7 +1494,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             )}
           </div>
           <p className="mt-1 text-[11px] text-night-500">{order ? `입장 #${order}` : "아직 지정되지 않았습니다."}</p>
-          {isHost ? (
+          {isHost && !isRelayRoom ? (
             <select
               value={slotSelections[slot]}
               disabled={assigningSlot === slot}
@@ -1508,7 +1508,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               ))}
             </select>
           ) : (
-            <p className="mt-3 rounded-lg border border-night-800/60 bg-night-900/50 px-3 py-2 text-xs text-night-400">방장이 순서를 조정할 수 있습니다.</p>
+            <p className="mt-3 rounded-lg border border-night-800/60 bg-night-900/50 px-3 py-2 text-xs text-night-400">
+              {isRelayRoom ? "릴레이 로스터에서 1번 주자를 지정하면 자동으로 배치됩니다." : "방장이 순서를 조정할 수 있습니다."}
+            </p>
           )}
         </div>
       );

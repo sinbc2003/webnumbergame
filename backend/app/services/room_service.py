@@ -175,13 +175,64 @@ class RoomService:
             "team_b": build(RELAY_TEAM_B),
         }
 
+    @staticmethod
+    def _first_relay_player(
+        participants: list[RoomParticipant],
+        team_label: str,
+        team_size: int,
+    ) -> str | None:
+        eligible = [
+            participant
+            for participant in participants
+            if participant.team_label == team_label and participant.order_index is not None
+        ]
+        eligible.sort(key=lambda participant: participant.order_index or 0)
+        for participant in eligible:
+            if participant.order_index is None or participant.order_index < 0:
+                continue
+            if participant.order_index >= team_size:
+                continue
+            return participant.user_id
+        return None
+
+    def _sync_relay_player_slots(
+        self,
+        room: Room,
+        participants: list[RoomParticipant],
+    ) -> bool:
+        if room.team_size <= 1:
+            return False
+
+        player_one = self._first_relay_player(participants, RELAY_TEAM_A, room.team_size)
+        player_two = self._first_relay_player(participants, RELAY_TEAM_B, room.team_size)
+
+        changed = False
+        if room.player_one_id != player_one:
+            room.player_one_id = player_one
+            changed = True
+        if room.player_two_id != player_two:
+            room.player_two_id = player_two
+            changed = True
+        if changed:
+            self.session.add(room)
+
+        active_players = {pid for pid in (player_one, player_two) if pid}
+        for participant in participants:
+            desired_role = (
+                ParticipantRole.PLAYER if participant.user_id in active_players else ParticipantRole.SPECTATOR
+            )
+            if participant.role != desired_role:
+                participant.role = desired_role
+                self.session.add(participant)
+        return changed
+
     async def update_relay_roster(
         self,
         *,
         room: Room,
         team_a: list[str | None],
         team_b: list[str | None],
-    ) -> dict:
+    ) -> tuple[dict, bool]:
         if room.team_size <= 1:
             raise ValueError("릴레이 슬롯을 지원하지 않는 방입니다.")
         normalized = {
@@ -213,12 +264,14 @@ class RoomService:
                 participant.order_index = None
             self.session.add(participant)
 
+        slots_changed = self._sync_relay_player_slots(room, participants)
         await self.session.commit()
-        return self._build_relay_payload(participants, usernames, room.team_size)
+        roster = self._build_relay_payload(participants, usernames, room.team_size)
+        return roster, slots_changed
 
-    async def normalize_relay_roster(self, room: Room) -> tuple[dict | None, bool]:
+    async def normalize_relay_roster(self, room: Room) -> tuple[dict | None, bool, bool]:
         if room.team_size <= 1:
-            return None, False
+            return None, False, False
 
         participants, usernames = await self._fetch_participants_with_user(room.id)
         has_change = False
@@ -245,6 +298,13 @@ class RoomService:
                     self.session.add(participant)
                     has_change = True
 
-        payload = self._build_relay_payload(participants, usernames, room.team_size)
-        return payload, has_change
+        slots_changed = self._sync_relay_player_slots(room, participants)
+
+        if has_change or slots_changed:
+            await self.session.commit()
+            payload = self._build_relay_payload(participants, usernames, room.team_size)
+        else:
+            payload = None
+
+        return payload, has_change, slots_changed
 

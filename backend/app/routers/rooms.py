@@ -86,7 +86,8 @@ async def leave_room(
         forfeited = await _handle_player_forfeit(session, room, winner_user_id=remaining_player_id)
 
     relay_payload: dict | None = None
-    relay_changed = False
+    relay_roster_changed = False
+    relay_slots_changed = False
 
     if room.host_id == current_user.id:
         await session.execute(delete(RoomParticipant).where(RoomParticipant.room_id == room.id))
@@ -101,7 +102,7 @@ async def leave_room(
 
     if room.team_size > 1:
         service = RoomService(session)
-        relay_payload, relay_changed = await service.normalize_relay_roster(room)
+        relay_payload, relay_roster_changed, relay_slots_changed = await service.normalize_relay_roster(room)
 
     session.add(room)
     await session.commit()
@@ -114,7 +115,8 @@ async def leave_room(
             "user_id": current_user.id,
         },
     )
-    if slot_changed:
+    slots_updated = slot_changed or relay_slots_changed
+    if slots_updated:
         await manager.broadcast_room(
             room.id,
             {
@@ -124,7 +126,7 @@ async def leave_room(
                 "player_two_id": room.player_two_id,
             },
         )
-    if relay_changed:
+    if relay_payload and (relay_roster_changed or relay_slots_changed):
         event = _relay_event_payload(room, relay_payload)
         if event:
             await manager.broadcast_room(room.id, event)
@@ -355,13 +357,15 @@ async def update_relay_roster(
     service = RoomService(session)
     sanitize = lambda values: [(value or None) for value in values]
     try:
-        roster = await service.update_relay_roster(
+        roster, slot_changed = await service.update_relay_roster(
             room=room,
             team_a=sanitize(payload.team_a),
             team_b=sanitize(payload.team_b),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    await session.refresh(room)
 
     response_payload = {
         "room_id": room.id,
@@ -370,6 +374,16 @@ async def update_relay_roster(
         "team_b": roster.get("team_b", []),
     }
     await manager.broadcast_room(room.id, {"type": "relay_roster", **response_payload})
+    if slot_changed:
+        await manager.broadcast_room(
+            room.id,
+            {
+                "type": "player_assignment",
+                "room_id": room.id,
+                "player_one_id": room.player_one_id,
+                "player_two_id": room.player_two_id,
+            },
+        )
     return RelayRosterResponse(**response_payload)
 
 
