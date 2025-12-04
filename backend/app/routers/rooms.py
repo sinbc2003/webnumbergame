@@ -531,6 +531,7 @@ async def _finalize_room(
     session.add(room)
     await session.commit()
 
+    if reason in {"host_left", "host_left_forfeit", "host_disconnected"}:
         await manager.broadcast_room(
             room.id,
             {
@@ -540,14 +541,14 @@ async def _finalize_room(
                 "severity": "warning",
             },
         )
-        await manager.broadcast_room(
-            room.id,
-            {
-                "type": "room_closed",
-                "room_id": room.id,
-                "reason": reason,
-            },
-        )
+    await manager.broadcast_room(
+        room.id,
+        {
+            "type": "room_closed",
+            "room_id": room.id,
+            "reason": reason,
+        },
+    )
 
 
 @router.post("/{room_id}/submit", response_model=dict)
