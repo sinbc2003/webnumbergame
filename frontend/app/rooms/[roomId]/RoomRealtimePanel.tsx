@@ -252,7 +252,7 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         </div>
       )}
 
-      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5 flex min-h-[300px] max-h-[460px] flex-col overflow-hidden">
+      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5 flex h-[420px] lg:h-[60vh] flex-col overflow-hidden">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-white">참여자 {participantItems.length}명</p>
           <span className="text-xs text-night-500">방장/플레이어/관전자</span>
