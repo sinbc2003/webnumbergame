@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/useAuth";
@@ -30,6 +30,12 @@ export default function AdminPanel() {
   const [resetUserMessage, setResetUserMessage] = useState<string | null>(null);
   const [resetUserError, setResetUserError] = useState<string | null>(null);
   const [resetUserPayload, setResetUserPayload] = useState({ username: "", user_id: "" });
+  const [importRoundType, setImportRoundType] = useState("round1_individual");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchProblems = useCallback(async () => {
     if (!user?.is_admin) return;
@@ -93,6 +99,37 @@ export default function AdminPanel() {
       fetchProblems();
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? "문제를 추가하지 못했습니다.");
+    }
+  };
+
+  const handleImportSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!importFile) {
+      setImportError("CSV 파일을 선택해 주세요.");
+      return;
+    }
+    const formData = new FormData();
+    formData.append("file", importFile);
+    setImportError(null);
+    setImportSuccess(null);
+    setImportWarnings([]);
+    try {
+      const { data } = await api.post<{ imported: number; errors?: string[] }>(
+        `/admin/problems/import?round_type=${importRoundType}`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" }
+        }
+      );
+      setImportSuccess(`${data.imported}개의 문제를 등록했습니다.`);
+      setImportWarnings(data.errors ?? []);
+      setImportFile(null);
+      if (importInputRef.current) {
+        importInputRef.current.value = "";
+      }
+      fetchProblems();
+    } catch (err: any) {
+      setImportError(err?.response?.data?.detail ?? "CSV 업로드에 실패했습니다.");
     }
   };
 
@@ -178,6 +215,57 @@ export default function AdminPanel() {
         </form>
         {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
         {success && <p className="mt-3 text-sm text-green-400">{success}</p>}
+      </div>
+
+      <div className="rounded-xl border border-night-800 bg-night-950/50 p-5">
+        <h2 className="text-lg font-semibold text-white">CSV 일괄 등록</h2>
+        <p className="mt-1 text-sm text-night-400">
+          A열 헤더는 &ldquo;목표값&rdquo;, B열 헤더는 &ldquo;최소cost&rdquo; 이어야 하며 2행부터 데이터가 입력된 CSV를 업로드하세요.
+        </p>
+        <form onSubmit={handleImportSubmit} className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="text-sm text-night-300">
+            <span className="mb-1 block text-night-400">라운드 구분</span>
+            <select
+              value={importRoundType}
+              onChange={(event) => setImportRoundType(event.target.value)}
+              className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+            >
+              <option value="round1_individual">1라운드 개인전</option>
+              <option value="round2_team">2라운드 팀전</option>
+            </select>
+          </label>
+          <label className="text-sm text-night-300">
+            <span className="mb-1 block text-night-400">CSV 파일</span>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv"
+              onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+              className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+              required
+            />
+          </label>
+          <div className="sm:col-span-2 flex items-end">
+            <button
+              type="submit"
+              className="w-full rounded-md bg-emerald-600 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500"
+            >
+              CSV 업로드
+            </button>
+          </div>
+        </form>
+        {importError && <p className="mt-3 text-sm text-red-400">{importError}</p>}
+        {importSuccess && <p className="mt-3 text-sm text-green-400">{importSuccess}</p>}
+        {!!importWarnings.length && (
+          <div className="mt-3 rounded-md border border-amber-400/50 bg-amber-500/10 p-3 text-xs text-amber-100">
+            <p className="font-semibold">처리되지 않은 행</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              {importWarnings.map((warning, index) => (
+                <li key={`${warning}-${index}`}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-night-800 bg-night-950/40 p-5">
