@@ -1392,65 +1392,63 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     return (
       <div className="min-h-screen bg-[#050a15] px-4 py-6 text-night-100">
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
-        <div className="mx-auto flex max-w-5xl flex-col gap-5">
-          <div className="flex justify-center">
-            <div className="flex flex-col items-center gap-2 text-center">
-              <p className="text-[10px] uppercase tracking-[0.4em] text-night-500">남은 시간</p>
-              <div
-                className={`rounded-full border px-8 py-3 text-4xl font-black ${
-                  isCountdownCritical ? "border-red-500 text-red-300" : "border-indigo-400 text-white"
-                } bg-night-900/60`}
-              >
-                {formattedRemaining}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-[1.35fr_0.65fr]">
-            <div className="rounded-3xl border border-night-800/60 bg-night-950/70 p-4 shadow-[0_25px_70px_rgba(0,0,0,0.6)] sm:p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-3">
-                  <p className="text-[11px] uppercase tracking-[0.45em] text-night-500">{roundLabel}</p>
-                  <div className="grid gap-4 text-white sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs text-night-500">목표값</p>
-                      <p className="text-4xl font-black text-white">{activeMatch.target_number}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-night-500">최적 연산기호수</p>
-                      <p className="text-4xl font-black text-white">{activeMatch.optimal_cost}</p>
-                    </div>
+        <div className="mx-auto flex max-w-5xl flex-col gap-4">
+          <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-3xl border border-night-800/60 bg-night-950/70 p-4 shadow-[0_25px_60px_rgba(0,0,0,0.55)] sm:p-5">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.45em] text-night-500">{roundLabel}</p>
+                    <p className="mt-1 text-xs text-night-400">
+                      {activeMatch.current_index + 1} / {activeMatch.total_problems} 문제 진행 중
+                    </p>
                   </div>
-                  <p className="text-sm text-night-400">
-                    {activeMatch.current_index + 1} / {activeMatch.total_problems} 문제 진행 중
-                  </p>
-                  <div className="grid gap-3 text-night-200 sm:grid-cols-2">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">값</p>
-                      <p className="text-2xl font-bold text-white">{expressionValueDisplay}</p>
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase tracking-[0.4em] text-night-500">남은 시간</p>
+                      <div
+                        className={`mt-2 rounded-full border px-6 py-2 text-3xl font-black ${
+                          isCountdownCritical ? "border-red-500 text-red-300" : "border-indigo-400 text-white"
+                        } bg-night-900/60`}
+                      >
+                        {formattedRemaining}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">연산기호</p>
-                      <p className="text-2xl font-bold text-white">{operatorCountDisplay}</p>
-                    </div>
+                    <div className="flex justify-end">{renderLeaveButton()}</div>
                   </div>
                 </div>
-                <div className="self-start">{renderLeaveButton()}</div>
-              </div>
-              <div className="mt-4 rounded-2xl border border-night-900/60 bg-night-900/30 p-3 text-xs text-night-300">
-                <p className="text-sm text-night-300">
-                  현재 플레이어 <span className="font-semibold text-white">{participantLabel(assignedUser)}</span>
-                </p>
+
+                <div className="grid gap-4 text-white sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs text-night-500">목표값</p>
+                    <p className="text-4xl font-black text-white">{activeMatch.target_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-night-500">최적 연산기호수</p>
+                    <p className="text-4xl font-black text-white">{activeMatch.optimal_cost}</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 text-night-200 sm:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">값</p>
+                    <p className="text-2xl font-bold text-white">{expressionValueDisplay}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">연산기호</p>
+                    <p className="text-2xl font-bold text-white">{operatorCountDisplay}</p>
+                  </div>
+                </div>
               </div>
             </div>
-            <div className="rounded-3xl border border-night-800/60 bg-night-950/60 p-4 sm:p-5">
+            <div className="rounded-3xl border border-night-800/60 bg-night-950/60 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.45)] sm:p-5">
               <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-night-500">
                 <span role="img" aria-label="trophy">
                   🏆
                 </span>
                 최고 기록
               </p>
-              <div className="mt-3 max-h-40 overflow-y-auto rounded-2xl border border-night-900/50 bg-night-900/30 p-3 text-xs leading-relaxed">
+              <div className="mt-3 max-h-32 overflow-y-auto rounded-2xl border border-night-900/50 bg-night-900/30 p-3 text-xs leading-relaxed">
                 {historyItems.length === 0 ? (
                   <p className="text-night-500">아직 기록이 없습니다.</p>
                 ) : (
@@ -1468,7 +1466,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-night-800/70 bg-night-950/70 p-5 shadow-[0_25px_70px_rgba(0,0,0,0.6)] sm:p-6">
+          <div className="rounded-[32px] border border-night-800/70 bg-night-950/70 p-5 shadow-[0_25px_60px_rgba(0,0,0,0.55)] sm:p-6">
             <PlayerPanel
               key={mySlot}
               title={`${slotLabels.playerOne}`}
@@ -1485,6 +1483,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               warningMessage={inputWarnings[mySlot]}
               focusLayout
               emphasizeInput
+              hideIdentity
               textareaRefCallback={(el) => {
                 playerTextareaRefs.current[mySlot] = el;
               }}
@@ -2164,6 +2163,7 @@ interface PlayerPanelProps {
   focusLayout?: boolean;
   textareaRefCallback?: (el: HTMLTextAreaElement | null) => void;
   emphasizeInput?: boolean;
+  hideIdentity?: boolean;
 }
 
 function PlayerPanel({
@@ -2182,6 +2182,7 @@ function PlayerPanel({
   focusLayout,
   textareaRefCallback,
   emphasizeInput = false,
+  hideIdentity = false,
 }: PlayerPanelProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -2204,22 +2205,25 @@ function PlayerPanel({
             }
             return best;
           }, null);
+    const textareaMarginTop = hideIdentity ? "mt-4" : "mt-6";
     return (
       <div className="flex flex-1 flex-col gap-6 lg:flex-row">
         <div
           className={`flex-1 rounded-[32px] border-2 border-indigo-600/40 bg-night-950/60 ${emphasizeInput ? "p-7" : "p-6"} text-night-100 shadow-[0_25px_90px_rgba(0,0,0,0.6)]`}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-indigo-200/80">{title}</p>
-              <p className="text-3xl font-semibold text-white">{userLabel}</p>
+          {!hideIdentity && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-indigo-200/80">{title}</p>
+                <p className="text-3xl font-semibold text-white">{userLabel}</p>
+              </div>
+              {isMine && (
+                <span className="rounded-full border border-indigo-400/70 px-4 py-1 text-xs font-semibold text-indigo-200">
+                  내 화면
+                </span>
+              )}
             </div>
-            {isMine && (
-              <span className="rounded-full border border-indigo-400/70 px-4 py-1 text-xs font-semibold text-indigo-200">
-                내 화면
-              </span>
-            )}
-          </div>
+          )}
           <textarea
             value={expression}
             onChange={(e) => onExpressionChange?.(e.target.value)}
@@ -2230,7 +2234,7 @@ function PlayerPanel({
             spellCheck={false}
             autoComplete="off"
             ref={textareaRefCallback}
-            className={`mt-6 w-full flex-1 rounded-2xl border-2 border-indigo-500/40 bg-night-900 px-4 py-4 font-mono text-white focus:border-indigo-300 focus:outline-none ${
+            className={`${textareaMarginTop} w-full flex-1 rounded-2xl border-2 border-indigo-500/40 bg-night-900 px-4 py-4 font-mono text-white focus:border-indigo-300 focus:outline-none ${
               emphasizeInput ? "min-h-[220px] text-3xl" : "min-h-[160px] text-2xl"
             }`}
           />
