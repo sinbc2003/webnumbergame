@@ -874,7 +874,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       await api.delete(`/rooms/${roomId}/participants/me`);
       router.push("/rooms");
     } catch (err: any) {
-      if (err?.response?.status === 404) {
+      const status = err?.response?.status;
+      if (status && [403, 404, 409, 410].includes(status)) {
         router.push("/rooms");
       } else {
         setStatusError(err?.response?.data?.detail ?? "방 나가기 중 오류가 발생했습니다.");
