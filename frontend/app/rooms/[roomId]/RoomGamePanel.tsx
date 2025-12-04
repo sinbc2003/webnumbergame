@@ -1739,7 +1739,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             </div>
           )}
 
-          <div className="flex w-full flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-3 text-night-200 h-[420px] lg:h-[60vh] overflow-hidden sm:p-4">
+          <div className="flex w-full flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-3 text-night-200 h-[280px] lg:h-[40vh] overflow-hidden sm:p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-white">방 채팅</p>
               <span className="text-xs text-night-500">실시간 대화</span>

@@ -197,9 +197,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
           onSubmit={handleStartRound}
           className="rounded-3xl border border-night-800/70 bg-night-950/45 p-5 text-night-200"
         >
-          <p className="text-xs text-night-400">
-            방장이 라운드를 시작하면 스타크래프트식 5초 카운트다운이 표시된 뒤 경기가 전체 화면으로 전환됩니다.
-          </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <label className="space-y-1 text-night-400">
               <span>라운드 번호</span>
