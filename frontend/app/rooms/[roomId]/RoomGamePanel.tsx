@@ -551,7 +551,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
   const roundLabel = describeRoomMode({ mode: room.mode, team_size: teamSize });
   const matchupLabel = describeMatchup(teamSize);
-  const slotHeading = teamSize > 1 ? `${matchupLabel} 릴레이` : "Slot A / Slot B";
   const slotLabels = {
     playerOne: teamSize > 1 ? "릴레이 A 팀" : "플레이어 1",
     playerTwo: teamSize > 1 ? "릴레이 B 팀" : "플레이어 2",
@@ -1353,7 +1352,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       })
     : [];
   const lobbyShellClass =
-    "relative space-y-6 rounded-[30px] border border-night-800/80 bg-[rgba(5,10,20,0.85)] p-6 text-night-100 shadow-[0_25px_70px_rgba(0,0,0,0.6)]";
+    "relative space-y-4 rounded-2xl border border-night-800/80 bg-[rgba(5,10,20,0.88)] p-4 text-night-100 shadow-[0_20px_60px_rgba(0,0,0,0.55)] sm:p-5";
 
   const containerClass = isPlayerView
     ? "fixed inset-0 z-40 mx-auto flex w-full max-w-6xl flex-col bg-[#050a15] px-3 py-4 text-white sm:px-5 sm:py-5"
@@ -1387,8 +1386,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 <div className="self-start">{renderLeaveButton()}</div>
               </div>
               <div className="mt-6 rounded-2xl border border-night-900/60 bg-night-900/30 p-4 text-xs text-night-400">
-                <p>방 코드 {room.code}</p>
-                <p className="mt-1">
+                <p className="text-sm text-night-400">
                   현재 플레이어 <span className="font-semibold text-white">{participantLabel(assignedUser)}</span>
                 </p>
               </div>
@@ -1590,31 +1588,34 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   }
 
   if (!hasActiveMatch) {
-    const slotCardNodes = (["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => {
+    const renderSlotSelector = (slot: PlayerAssignmentSlot) => {
       const boardSlot: BoardSlot = slot === "player_one" ? "playerOne" : "playerTwo";
       const assignedUser = boardSlot === "playerOne" ? playerOne : playerTwo;
       const assignedParticipant = participantState.find((participant) => participant.user_id === assignedUser);
+      const showHostSelector = isHost && !isRelayRoom;
       const order = participantOrder(assignedUser);
+      const helperText = isRelayRoom
+        ? "릴레이 로스터에서 자동으로 지정됩니다."
+        : order
+          ? `입장 #${order}`
+          : showHostSelector
+            ? "아직 지정되지 않았습니다."
+            : "방장이 지정할 때까지 대기 중입니다.";
+      const label = slot === "player_one" ? "왼쪽 플레이어" : "오른쪽 플레이어";
       return (
-        <div key={`slot-${slot}`} className="rounded-2xl border border-night-800/70 bg-night-950/60 p-4 text-sm text-night-200">
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">
-                {slot === "player_one" ? slotLabels.playerOne.toUpperCase() : slotLabels.playerTwo.toUpperCase()}
-              </p>
-              <p className="text-xl font-semibold text-white">{participantLabel(assignedUser)}</p>
-            </div>
+        <div key={`slot-${slot}`} className="rounded-2xl border border-night-800/60 bg-night-950/40 p-3 text-sm text-night-200">
+          <div className="flex items-center justify-between text-[11px] text-night-500">
+            <span>{label}</span>
             {assignedParticipant?.is_ready && (
               <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
             )}
           </div>
-          <p className="mt-1 text-[11px] text-night-500">{order ? `입장 #${order}` : "아직 지정되지 않았습니다."}</p>
-          {isHost && !isRelayRoom ? (
+          {showHostSelector ? (
             <select
               value={slotSelections[slot]}
               disabled={assigningSlot === slot}
               onChange={(event) => handleAssignSlot(slot, event.target.value)}
-              className="mt-3 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+              className="mt-2 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
             >
               {participantOptions.map((option) => (
                 <option key={`${slot}-${option.value || "empty"}`} value={option.value}>
@@ -1623,27 +1624,28 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               ))}
             </select>
           ) : (
-            <p className="mt-3 rounded-lg border border-night-800/60 bg-night-900/50 px-3 py-2 text-xs text-night-400">
-              {isRelayRoom ? "릴레이 로스터에서 1번 주자를 지정하면 자동으로 배치됩니다." : "방장이 순서를 조정할 수 있습니다."}
-            </p>
+            <div className="mt-2 rounded-lg border border-night-800/60 bg-night-900/30 px-3 py-2 text-sm text-white">
+              {participantLabel(assignedUser)}
+            </div>
           )}
+          <p className="mt-1 text-[11px] text-night-500">{helperText}</p>
         </div>
       );
-    });
+    };
+
+    const slotSelectors = (["player_one", "player_two"] as PlayerAssignmentSlot[]).map((slot) => renderSlotSelector(slot));
 
     return (
       <div className={lobbyShellClass}>
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-night-800/60 pb-4">
+        <div className="flex flex-wrap items-end justify-between gap-3 pb-2 sm:gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.45em] text-night-500">ROOM LOBBY</p>
-            <h2 className="text-3xl font-black text-white">{room.name}</h2>
-            <p className="text-sm text-night-400">
-              {roundLabel} · 방 코드 <span className="font-mono text-emerald-300">{room.code}</span>
-            </p>
+            <p className="text-[10px] uppercase tracking-[0.35em] text-night-500">ROOM LOBBY</p>
+            <h2 className="text-2xl font-black text-white sm:text-3xl">{room.name}</h2>
+            <p className="text-sm text-night-400">{roundLabel}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="rounded-full border border-amber-400/60 px-4 py-1 text-xs font-semibold tracking-[0.45em] text-amber-200">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="rounded-full border border-amber-400/60 px-3 py-0.5 text-[10px] font-semibold tracking-[0.35em] text-amber-200">
               대기 중
             </span>
             {renderLeaveButton()}
@@ -1651,7 +1653,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         </div>
         {!user && <p className="text-sm text-night-500">로그인 후 이용해 주세요.</p>}
         {matchSummary && !showSummary && (
-          <div className="mt-3">
+          <div className="mt-2 sm:mt-3">
             <button
               type="button"
               onClick={() => setShowSummary(true)}
@@ -1662,7 +1664,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
         )}
         {showSummary && (
-          <div className="mt-3">
+          <div className="mt-2 sm:mt-3">
             <MatchSummaryCard
               summary={matchSummary}
               roomClosedReason={roomClosedReason}
@@ -1671,28 +1673,25 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             />
           </div>
         )}
-        <div className="mt-3 flex flex-1 flex-col gap-4 overflow-hidden">
-          <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-4 sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">플레이어 슬롯</p>
-                <p className="text-2xl font-semibold text-white">{slotHeading}</p>
-              </div>
-              <span className="rounded-full border border-indigo-500/50 px-3 py-1 text-[11px] tracking-[0.35em] text-indigo-200">
-                {isHost ? "HOST CONTROL" : "관전자 모드"}
+        <div className="mt-3 flex flex-1 flex-col gap-3 overflow-hidden sm:mt-4">
+          <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between text-[11px] uppercase tracking-[0.3em] text-night-500">
+              <span>플레이어 선택</span>
+              <span className="rounded-full border border-indigo-500/50 px-3 py-0.5 text-[10px] font-semibold text-indigo-200">
+                {isHost ? "HOST" : "관전자"}
               </span>
             </div>
-            <div className="mt-3 flex flex-col gap-3 md:grid md:grid-cols-[1fr_auto_1fr] md:items-stretch">
-              {slotCardNodes[0]}
-              <div className="flex items-center justify-center rounded-2xl border border-night-800/50 bg-night-950/40 p-4 text-xs font-semibold tracking-[0.45em] text-night-500">
+            <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto_1fr] md:items-center">
+              {slotSelectors[0]}
+              <div className="flex items-center justify-center rounded-2xl border border-night-800/50 bg-night-950/40 px-4 py-6 text-xs font-semibold tracking-[0.35em] text-night-400">
                 VS
               </div>
-              {slotCardNodes[1]}
+              {slotSelectors[1]}
             </div>
           </div>
 
           {isRelayRoom && (
-            <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-4 sm:p-5">
+            <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-3 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">릴레이 로스터</p>
@@ -1700,21 +1699,21 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 </div>
                 {relaySaving && <span className="text-xs text-night-500">업데이트 중...</span>}
               </div>
-              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <div className="mt-2 grid gap-2 lg:grid-cols-2">
                 {renderRelayTeamColumn("teamA")}
                 {renderRelayTeamColumn("teamB")}
               </div>
             </div>
           )}
 
-          <div className="flex w-full flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200 lg:max-h-[66vh] lg:overflow-hidden">
+          <div className="flex w-full flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-3 text-night-200 lg:max-h-[66vh] lg:overflow-hidden sm:p-4">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-white">방 채팅</p>
               <span className="text-xs text-night-500">실시간 대화</span>
             </div>
             <div
               ref={chatBodyRef}
-              className="mt-3 flex-1 min-h-[180px] space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
+              className="mt-2 flex-1 min-h-[180px] space-y-2 overflow-y-auto rounded-2xl border border-night-800/70 bg-night-950/60 p-3 text-xs text-night-100"
             >
               {chatMessages.length === 0 && <p className="text-night-500">아직 메시지가 없습니다.</p>}
               {chatMessages.map((message) => (
@@ -1751,7 +1750,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
 
           {roundOutcome && (
-            <div className="w-full rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+            <div className="w-full rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
               <p className="font-semibold">
                 {roundOutcome.reason === "timeout"
                   ? "시간 종료 결과"
