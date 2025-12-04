@@ -610,15 +610,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             {lastWinReason ? ` · ${lastWinReason}` : ""}
           </p>
         )}
-        <div className="mt-3 rounded-xl border border-night-900/60 bg-night-900/30 px-3 py-2 text-xs text-night-400">
-          <p className="uppercase tracking-[0.35em] text-night-600">Problem Score</p>
-          <p className="mt-1 text-2xl font-black text-white">
-            {problemWins.playerOne} : {problemWins.playerTwo}
-          </p>
-          <p className="text-[11px] text-night-500">
-            라운드 내 완료된 문제 승부 (A / B)
-          </p>
-        </div>
       </div>
     );
   };
