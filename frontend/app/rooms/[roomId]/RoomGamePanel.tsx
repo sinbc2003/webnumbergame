@@ -151,7 +151,10 @@ const computeExpressionValue = (value: string): number | null => {
   }
 };
 const countOperators = (expression: string): number =>
-  normalizedForEvaluation(expression).split("").filter((char) => char === "+" || char === "*").length;
+  normalizedForEvaluation(expression)
+    .split("")
+    .filter((char) => allowedTokens.has(char))
+    .length;
 const INPUT_WARNING = "사용 가능한 기호는 1, +, *, (, ) 만 허용됩니다.";
 const CRITICAL_COUNTDOWN_THRESHOLD = 5;
 const TEAM_ALLOWED_SYMBOLS: Array<{ symbol: string; label: string }> = [
