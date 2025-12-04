@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Any
 
-DEFAULT_COSTS: Dict[str, int] = {"1": 1, "+": 1, "*": 2, "(": 1, ")": 1}
+DEFAULT_COSTS: Dict[str, int] = {"1": 1, "+": 1, "*": 1, "(": 1, ")": 1}
 
 
 def preprocess_expression(expr: str, mode: str = "normal") -> str:

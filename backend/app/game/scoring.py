@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 
-DEFAULT_COSTS = {"1": 1, "+": 1, "*": 2, "(": 1, ")": 1}
+DEFAULT_COSTS = {"1": 1, "+": 1, "*": 1, "(": 1, ")": 1}
 
 
 @dataclass
