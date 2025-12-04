@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
-import { describeRoomMode } from "@/lib/roomLabels";
 import { RELAY_TEAM_A, RELAY_TEAM_B } from "@/lib/relay";
 import type { Participant, Room } from "@/types/api";
 
@@ -26,7 +25,6 @@ const resolveWsBase = () => {
 
 export default function RoomRealtimePanel({ room, participants }: Props) {
   const roomId = room.id;
-  const roomCode = room.code;
   const hostId = room.host_id;
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
   const [roundNumber, setRoundNumber] = useState(room.current_round);
@@ -192,57 +190,8 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
     };
   });
 
-  const modeLabel = describeRoomMode({ mode: room.mode, team_size: room.team_size });
-  const statusLabel =
-    room.status === "in_progress" ? "진행 중" : room.status === "completed" ? "종료" : "대기 중";
-  const statusBadgeClass =
-    room.status === "in_progress"
-      ? "border-emerald-500 text-emerald-300"
-      : room.status === "completed"
-        ? "border-night-600 text-night-200"
-        : "border-amber-400 text-amber-200";
-  const mapName = room.description?.trim() || "추억의 성큰웨이 #X2";
-  const hostDisplayName = displayName(participantList.find((p) => p.user_id === hostId), hostId);
-
   return (
     <div className="space-y-5 text-sm text-night-200">
-      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">ROOM OVERVIEW</p>
-            <p className="mt-1 text-2xl font-semibold text-white">{room.name}</p>
-            <p className="text-sm text-night-400">방 코드 {room.code}</p>
-          </div>
-          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusBadgeClass}`}>{statusLabel}</span>
-        </div>
-        <div className="mt-4 grid gap-3 text-xs text-night-300 sm:grid-cols-2">
-          <div>
-            <p className="text-night-500">모드</p>
-            <p className="text-lg font-semibold text-white">{modeLabel}</p>
-          </div>
-          <div>
-            <p className="text-night-500">호스트</p>
-            <p className="text-lg font-semibold text-white">{hostDisplayName}</p>
-          </div>
-          <div>
-            <p className="text-night-500">지도 이름</p>
-            <p className="text-lg font-semibold text-white">{mapName}</p>
-          </div>
-          <div>
-            <p className="text-night-500">참가자</p>
-            <p className="text-lg font-semibold text-white">{participantItems.length}명 참가 중</p>
-          </div>
-          <div>
-            <p className="text-night-500">진행 시간</p>
-            <p className="text-lg font-semibold text-white">{durationMinutes}분</p>
-          </div>
-          <div>
-            <p className="text-night-500">문제 개수</p>
-            <p className="text-lg font-semibold text-white">{problemCount}개</p>
-          </div>
-        </div>
-      </div>
-
       {isHost ? (
         <form
           onSubmit={handleStartRound}
@@ -303,7 +252,7 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         </div>
       )}
 
-      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5 h-[420px] lg:h-[66vh] flex flex-col">
+      <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5 flex min-h-[300px] max-h-[460px] flex-col overflow-hidden">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-white">참여자 {participantItems.length}명</p>
           <span className="text-xs text-night-500">방장/플레이어/관전자</span>
