@@ -37,6 +37,7 @@ settings = get_settings()
 LOCKED_ROUND_NUMBER = 1
 LOCKED_PROBLEM_COUNT = 3
 LOCKED_PROBLEM_DURATION_MINUTES = 1
+PROBLEM_TRANSITION_DELAY_SECONDS = 1
 
 
 def _participant_to_public(participant: RoomParticipant, username: str) -> ParticipantPublic:
@@ -671,7 +672,7 @@ async def _handle_problem_completion(
     metadata["current_index"] = next_index
     match.target_number = next_problem["target_number"]
     match.optimal_cost = next_problem["optimal_cost"]
-    transition_delay = timedelta(seconds=settings.round_start_delay_seconds)
+    transition_delay = timedelta(seconds=PROBLEM_TRANSITION_DELAY_SECONDS)
     match.deadline = datetime.utcnow() + timedelta(minutes=duration_minutes) + transition_delay
     match.metadata_snapshot = dict(metadata)
     match.started_at = datetime.utcnow()
