@@ -464,7 +464,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">SCORE BOARD</p>
         <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-xs text-night-500">Slot A</p>
+            <p className="text-xs text-night-500">{slotLabels.playerOne}</p>
             <p className="text-lg font-semibold text-white">{slotALabel}</p>
             <p className="mt-1 text-3xl font-black text-emerald-300">{scoreboard.playerOne}</p>
           </div>
@@ -472,7 +472,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             <span className="text-sm text-night-500">vs</span>
           </div>
           <div className="text-right">
-            <p className="text-xs text-night-500">Slot B</p>
+            <p className="text-xs text-night-500">{slotLabels.playerTwo}</p>
             <p className="text-lg font-semibold text-white">{slotBLabel}</p>
             <p className="mt-1 text-3xl font-black text-indigo-300">{scoreboard.playerTwo}</p>
           </div>
@@ -490,6 +490,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const roundLabel = describeRoomMode({ mode: room.mode, team_size: teamSize });
   const matchupLabel = describeMatchup(teamSize);
   const slotHeading = teamSize > 1 ? `${matchupLabel} 릴레이` : "Slot A / Slot B";
+  const slotLabels = {
+    playerOne: teamSize > 1 ? "릴레이 A 팀" : "플레이어 1",
+    playerTwo: teamSize > 1 ? "릴레이 B 팀" : "플레이어 2",
+  };
   const participantQueue = useMemo(() => {
     return participantState
       .map((participant, index) => ({ participant, index }))
@@ -1176,7 +1180,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               return (
                 <PlayerPanel
                   key={slot}
-                  title={slot === "playerOne" ? "플레이어 1" : "플레이어 2"}
+                  title={slot === "playerOne" ? slotLabels.playerOne : slotLabels.playerTwo}
                   userLabel={participantLabel(assignedUser)}
                   expression={boards[slot].expression}
                   history={boards[slot].history}
@@ -1234,7 +1238,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         <div key={`slot-${slot}`} className="rounded-2xl border border-night-800/70 bg-night-950/60 p-4 text-sm text-night-200">
           <div className="flex items-center justify-between gap-2">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">{slot === "player_one" ? "SLOT A" : "SLOT B"}</p>
+              <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">
+                {slot === "player_one" ? slotLabels.playerOne.toUpperCase() : slotLabels.playerTwo.toUpperCase()}
+              </p>
               <p className="text-xl font-semibold text-white">{participantLabel(assignedUser)}</p>
             </div>
             {assignedParticipant?.is_ready && (
@@ -1457,7 +1463,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           return (
             <PlayerPanel
               key={slot}
-              title={slot === "playerOne" ? "플레이어 1" : "플레이어 2"}
+              title={slot === "playerOne" ? slotLabels.playerOne : slotLabels.playerTwo}
               userLabel={participantLabel(assignedUser)}
               expression={boards[slot].expression}
               history={boards[slot].history}
