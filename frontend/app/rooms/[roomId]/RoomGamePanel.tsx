@@ -77,6 +77,8 @@ interface HistoryEntry {
   score: number;
   value: number | null;
   timestamp: string;
+  isOptimal?: boolean;
+  metTarget?: boolean;
 }
 
 interface BoardState {
@@ -936,6 +938,13 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   score: payload.submission!.score,
                   value: payload.submission!.result_value ?? null,
                   timestamp: new Date().toISOString(),
+                  isOptimal: Boolean(payload.submission!.is_optimal),
+                  metTarget:
+                    typeof payload.submission!.result_value === "number" &&
+                    Boolean(
+                      (activeMatchRef.current?.target_number ?? activeMatch?.target_number) ===
+                        payload.submission!.result_value,
+                    ),
                 };
                 const shouldRecord = allowHistory(entry);
                 const nextHistory: HistoryEntry[] = shouldRecord
@@ -1324,15 +1333,17 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const myBoard = mySlot ? boards[mySlot] : null;
   const myExpression = myBoard?.expression ?? "";
   const myHistory = myBoard?.history ?? [];
-  const allowHistory = (entry: HistoryEntry | null) => {
+  const allowHistory = (entry: HistoryEntry | null, matchOverride?: ActiveMatch | null) => {
     if (!entry) return false;
-    if (!hasActiveMatch) return false;
-    const match = activeMatch || activeMatchRef.current;
+    const match = matchOverride ?? activeMatch ?? activeMatchRef.current;
     if (!match) return false;
-    if (typeof entry.value !== "number") return false;
-    const isTargetMatched = entry.value === match.target_number;
-    const isOptimal = entry.score >= 0 && entry.score !== null && entry.score !== undefined && entry.score > 0;
-    return isTargetMatched || isOptimal;
+    if (entry.metTarget || entry.isOptimal) {
+      return true;
+    }
+    if (typeof entry.value === "number") {
+      return entry.value === match.target_number;
+    }
+    return false;
   };
   const expressionValue = useMemo(() => computeExpressionValue(myExpression), [myExpression]);
   const operatorCount = useMemo(() => countOperators(myExpression), [myExpression]);
