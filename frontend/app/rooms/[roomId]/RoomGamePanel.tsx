@@ -1137,6 +1137,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             setStatusMessage("다음 문제로 이동했습니다.");
             lastProblemSnapshotRef.current = null;
             setLatestCostBySlot({ playerOne: null, playerTwo: null });
+            setBoards({
+              playerOne: createBoardState(),
+              playerTwo: createBoardState(),
+            });
             if (payload.problem_index !== undefined) {
               applyActiveMatchPatch({
                 current_index: payload.problem_index,
