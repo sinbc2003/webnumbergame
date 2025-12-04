@@ -447,12 +447,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     }
   }, [hasActiveMatch]);
 
-  useEffect(() => {
-    if (!mySlot) {
-      setAdvancePrompt(null);
-    }
-  }, [mySlot]);
-
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
   const isHost = user?.id === room.host_id;
 
@@ -1120,6 +1114,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             if (!payload.submission) break;
             const slot = slotFromUserId(payload.submission.user_id);
             if (slot) {
+              const currentTarget = activeMatchRef.current?.target_number ?? null;
               const submissionCost =
                 typeof payload.submission.cost === "number"
                   ? payload.submission.cost
@@ -1132,8 +1127,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 const metTarget =
                   payload.submission!.distance === 0 ||
                   (typeof payload.submission!.result_value === "number" &&
-                    (activeMatchRef.current?.target_number ?? activeMatch?.target_number) ===
-                      payload.submission!.result_value);
+                    currentTarget === payload.submission!.result_value);
                 const entry: HistoryEntry = {
                   expression: payload.submission!.expression,
                   operatorCount: submissionCost,
@@ -1407,7 +1401,19 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       }
     };
     return () => ws.close();
-  }, [user, wsUrl, mutate, refreshRoomSnapshot, router, participantLabel, playTone, triggerPreCountdown, matchupLabel]);
+  }, [
+    user,
+    wsUrl,
+    mutate,
+    refreshRoomSnapshot,
+    router,
+    participantLabel,
+    playTone,
+    triggerPreCountdown,
+    matchupLabel,
+    applyActiveMatchPatch,
+    handleProblemOutcome,
+  ]);
 
   useEffect(() => {
     if (!user?.id || !room.code) return;
@@ -1494,6 +1500,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     if (playerTwo && user.id === playerTwo) return "playerTwo";
     return null;
   }, [user?.id, playerOne, playerTwo]);
+
+  useEffect(() => {
+    if (!mySlot) {
+      setAdvancePrompt(null);
+    }
+  }, [mySlot]);
 
   useEffect(() => {
     onPlayerFocusChange?.(hasActiveMatch && Boolean(mySlot));
@@ -1606,9 +1618,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     return (
       <>
         {renderAdvancePrompt()}
-        <div className="min-h-screen bg-[#050a15] px-4 py-6 text-night-100">
-          {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
-          <div className="mx-auto flex max-w-5xl flex-col gap-3">
+      <div className="min-h-screen bg-[#050a15] px-4 py-6 text-night-100">
+        {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
+        <div className="mx-auto flex max-w-5xl flex-col gap-3">
           <div className="rounded-3xl border border-night-800/60 bg-night-950/70 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.5)] sm:p-5">
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-3">
@@ -1661,37 +1673,37 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             </div>
           </div>
 
-            <div className="rounded-[32px] border border-night-800/70 bg-night-950/70 p-5 shadow-[0_25px_60px_rgba(0,0,0,0.55)] sm:p-6">
-              <PlayerPanel
-                key={mySlot}
-                title={`${slotLabels.playerOne}`}
-                userLabel={participantLabel(assignedUser)}
-                expression={boards[mySlot].expression}
-                history={boards[mySlot].history}
-                onExpressionChange={(value) => handleExpressionChange(mySlot, value)}
-                onSubmit={() => submitExpression(mySlot)}
-                onFocus={armAudio}
+          <div className="rounded-[32px] border border-night-800/70 bg-night-950/70 p-5 shadow-[0_25px_60px_rgba(0,0,0,0.55)] sm:p-6">
+            <PlayerPanel
+              key={mySlot}
+              title={`${slotLabels.playerOne}`}
+              userLabel={participantLabel(assignedUser)}
+              expression={boards[mySlot].expression}
+              history={boards[mySlot].history}
+              onExpressionChange={(value) => handleExpressionChange(mySlot, value)}
+              onSubmit={() => submitExpression(mySlot)}
+              onFocus={armAudio}
                 disabled={!activeMatch || !assignedUser || isAdvanceBlocked}
-                isMine
-                submitting={submittingSlot === mySlot}
-                placeholder="예: (1+1)*1"
-                warningMessage={inputWarnings[mySlot]}
-                focusLayout
-                emphasizeInput
-                hideIdentity
-                opponentOperatorCount={opponentCostForSolo}
-                textareaRefCallback={(el) => {
-                  playerTextareaRefs.current[mySlot] = el;
-                }}
-              />
-            </div>
+              isMine
+              submitting={submittingSlot === mySlot}
+              placeholder="예: (1+1)*1"
+              warningMessage={inputWarnings[mySlot]}
+              focusLayout
+              emphasizeInput
+              hideIdentity
+              opponentOperatorCount={opponentCostForSolo}
+              textareaRefCallback={(el) => {
+                playerTextareaRefs.current[mySlot] = el;
+              }}
+            />
+          </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <div className="text-emerald-300">{statusMessage && <>• {statusMessage}</>}</div>
-              <div className="text-red-400">{statusError && <>• {statusError}</>}</div>
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="text-emerald-300">{statusMessage && <>• {statusMessage}</>}</div>
+            <div className="text-red-400">{statusError && <>• {statusError}</>}</div>
           </div>
         </div>
+      </div>
       </>
     );
   }
@@ -1700,140 +1712,140 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     return (
       <>
         {renderAdvancePrompt()}
-        <div className={`${containerClass} relative`}>
-          {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
-          <div className="flex h-full flex-col gap-4">
-            <div className="rounded-[32px] border-2 border-indigo-500/50 bg-night-950/70 px-5 py-4 text-night-100 shadow-[0_30px_80px_rgba(0,0,0,0.65)]">
-              <div className="flex flex-wrap items-end gap-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.55em] text-indigo-200/70">{roundLabel}</p>
-                  <div className="mt-2 flex items-end gap-3">
-                    <span className="text-base text-night-400">문제 :</span>
-                    <span className="text-5xl font-black text-white sm:text-6xl">{activeMatch.target_number}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-night-500">
-                    {activeMatch.current_index + 1} / {activeMatch.total_problems} 문제 진행 중
-                  </p>
+      <div className={`${containerClass} relative`}>
+        {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
+        <div className="flex h-full flex-col gap-4">
+          <div className="rounded-[32px] border-2 border-indigo-500/50 bg-night-950/70 px-5 py-4 text-night-100 shadow-[0_30px_80px_rgba(0,0,0,0.65)]">
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.55em] text-indigo-200/70">{roundLabel}</p>
+                <div className="mt-2 flex items-end gap-3">
+                  <span className="text-base text-night-400">문제 :</span>
+                  <span className="text-5xl font-black text-white sm:text-6xl">{activeMatch.target_number}</span>
                 </div>
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
-                  <div className="min-w-[130px] rounded-2xl border border-indigo-400/50 bg-night-900/70 px-4 py-3 text-right">
-                    <p className="text-[11px] tracking-[0.45em] text-indigo-200">값</p>
-                    <p className="text-3xl font-black text-white">{expressionValueDisplay}</p>
-                  </div>
-                  <div className="min-w-[150px] rounded-2xl border border-amber-400/50 bg-night-900/70 px-4 py-3 text-right">
-                    <p className="text-[11px] tracking-[0.35em] text-amber-200">연산기호개수</p>
-                    <p className="text-3xl font-black text-amber-200">{operatorCountDisplay}</p>
-                  </div>
-                  <div className="hidden sm:block">{renderLeaveButton()}</div>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-night-400 sm:gap-4">
-                <p className="font-semibold text-amber-200">
-                  최적 코스트 {activeMatch.optimal_cost} 이하로 정답을 만들면 즉시 승리!
+                <p className="mt-1 text-xs text-night-500">
+                  {activeMatch.current_index + 1} / {activeMatch.total_problems} 문제 진행 중
                 </p>
-                <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-[0.4em] text-night-500">
-                  {problemIndicators.map((state, index) => (
-                    <span
-                      key={`indicator-${index}`}
-                      className={`h-1.5 w-6 rounded-full ${state === "current" ? "bg-amber-400" : state === "done" ? "bg-emerald-400" : "bg-night-700"}`}
-                    />
-                  ))}
+              </div>
+              <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
+                <div className="min-w-[130px] rounded-2xl border border-indigo-400/50 bg-night-900/70 px-4 py-3 text-right">
+                  <p className="text-[11px] tracking-[0.45em] text-indigo-200">값</p>
+                  <p className="text-3xl font-black text-white">{expressionValueDisplay}</p>
                 </div>
+                <div className="min-w-[150px] rounded-2xl border border-amber-400/50 bg-night-900/70 px-4 py-3 text-right">
+                  <p className="text-[11px] tracking-[0.35em] text-amber-200">연산기호개수</p>
+                  <p className="text-3xl font-black text-amber-200">{operatorCountDisplay}</p>
+                </div>
+                <div className="hidden sm:block">{renderLeaveButton()}</div>
               </div>
             </div>
-
-            {renderScoreboardPanel()}
-
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <div className="space-y-1 text-emerald-300">
-                {statusMessage && <p>• {statusMessage}</p>}
-              </div>
-              <div className="space-y-1 text-red-400">{statusError && <p>• {statusError}</p>}</div>
-              <div className="sm:hidden">{renderLeaveButton()}</div>
-            </div>
-
-            <div className="flex flex-1 flex-col">
-              {visibleSlots.map((slot) => {
-                const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
-                const isMine = mySlot === slot;
-                const slotOpponentCost =
-                  slot === "playerOne" ? latestCostBySlot.playerTwo : latestCostBySlot.playerOne;
-                if (isTeamRound && isMine) {
-                  return (
-                    <TeamBoard
-                      key={slot}
-                      matchId={activeMatch.match_id}
-                      teamSize={teamSize}
-                      expression={boards[slot].expression}
-                      history={boards[slot].history}
-                      onExpressionChange={(value) => handleExpressionChange(slot, value)}
-                      onSubmit={() => submitExpression(slot)}
-                      submitting={submittingSlot === slot}
-                      disabled={!activeMatch || !assignedUser || isAdvanceBlocked}
-                      playTone={playTone}
-                      armAudio={armAudio}
-                      opponentOperatorCount={slotOpponentCost}
-                    />
-                  );
-                }
-                return (
-                  <PlayerPanel
-                    key={slot}
-                    title={slot === "playerOne" ? slotLabels.playerOne : slotLabels.playerTwo}
-                    userLabel={participantLabel(assignedUser)}
-                    expression={boards[slot].expression}
-                    history={boards[slot].history}
-                    onExpressionChange={isMine ? (value) => handleExpressionChange(slot, value) : undefined}
-                    onSubmit={isMine ? () => submitExpression(slot) : undefined}
-                    onFocus={isMine ? armAudio : undefined}
-                    disabled={!activeMatch || !assignedUser || (isMine && isAdvanceBlocked)}
-                    isMine={isMine}
-                    submitting={submittingSlot === slot}
-                    placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
-                    warningMessage={inputWarnings[slot]}
-                    focusLayout
-                    opponentOperatorCount={slotOpponentCost}
-                    textareaRefCallback={(el) => {
-                      playerTextareaRefs.current[slot] = el;
-                    }}
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-night-400 sm:gap-4">
+              <p className="font-semibold text-amber-200">
+                최적 코스트 {activeMatch.optimal_cost} 이하로 정답을 만들면 즉시 승리!
+              </p>
+              <div className="flex flex-wrap gap-1 text-[10px] uppercase tracking-[0.4em] text-night-500">
+                {problemIndicators.map((state, index) => (
+                  <span
+                    key={`indicator-${index}`}
+                    className={`h-1.5 w-6 rounded-full ${state === "current" ? "bg-amber-400" : state === "done" ? "bg-emerald-400" : "bg-night-700"}`}
                   />
-                );
-              })}
-            </div>
-
-            <div className="rounded-3xl border border-night-800/80 bg-night-950/50 px-6 py-4 text-night-300">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs text-night-500">문제 진행도</p>
-                  <p className="text-lg font-semibold text-white">
-                    {activeMatch.current_index + 1} / {activeMatch.total_problems}
-                  </p>
-                </div>
-                <div className="flex flex-1 justify-center">
-                  <div
-                    className={`flex h-32 w-32 items-center justify-center rounded-full border-4 font-mono text-4xl sm:text-5xl ${
-                      isCountdownCritical ? "border-red-500 text-red-300" : "border-indigo-400 text-indigo-200"
-                    } bg-night-900/60`}
-                  >
-                    {formattedRemaining}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-night-500">남은 문제</p>
-                  <p className="text-lg font-semibold text-white">
-                    {Math.max(0, activeMatch.total_problems - activeMatch.current_index - 1)}개
-                  </p>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-sm text-night-400">
-                <p className="text-[11px] uppercase tracking-[0.35em] text-night-600">문제 스코어</p>
-                <p className="text-2xl font-black text-white">
-                  {problemWins.playerOne} : {problemWins.playerTwo}
-                </p>
+                ))}
               </div>
             </div>
           </div>
+
+          {renderScoreboardPanel()}
+
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="space-y-1 text-emerald-300">
+              {statusMessage && <p>• {statusMessage}</p>}
+            </div>
+            <div className="space-y-1 text-red-400">{statusError && <p>• {statusError}</p>}</div>
+            <div className="sm:hidden">{renderLeaveButton()}</div>
+          </div>
+
+          <div className="flex flex-1 flex-col">
+            {visibleSlots.map((slot) => {
+              const assignedUser = slot === "playerOne" ? playerOne : playerTwo;
+              const isMine = mySlot === slot;
+               const slotOpponentCost =
+                slot === "playerOne" ? latestCostBySlot.playerTwo : latestCostBySlot.playerOne;
+              if (isTeamRound && isMine) {
+                return (
+                  <TeamBoard
+                    key={slot}
+                    matchId={activeMatch.match_id}
+                    teamSize={teamSize}
+                    expression={boards[slot].expression}
+                    history={boards[slot].history}
+                    onExpressionChange={(value) => handleExpressionChange(slot, value)}
+                    onSubmit={() => submitExpression(slot)}
+                    submitting={submittingSlot === slot}
+                      disabled={!activeMatch || !assignedUser || isAdvanceBlocked}
+                    playTone={playTone}
+                    armAudio={armAudio}
+                    opponentOperatorCount={slotOpponentCost}
+                  />
+                );
+              }
+              return (
+                <PlayerPanel
+                  key={slot}
+                  title={slot === "playerOne" ? slotLabels.playerOne : slotLabels.playerTwo}
+                  userLabel={participantLabel(assignedUser)}
+                  expression={boards[slot].expression}
+                  history={boards[slot].history}
+                  onExpressionChange={isMine ? (value) => handleExpressionChange(slot, value) : undefined}
+                  onSubmit={isMine ? () => submitExpression(slot) : undefined}
+                  onFocus={isMine ? armAudio : undefined}
+                    disabled={!activeMatch || !assignedUser || (isMine && isAdvanceBlocked)}
+                  isMine={isMine}
+                  submitting={submittingSlot === slot}
+                  placeholder={slot === "playerOne" ? "예: (1+1)*1" : "예: 1+(1*1)"}
+                  warningMessage={inputWarnings[slot]}
+                  focusLayout
+                  opponentOperatorCount={slotOpponentCost}
+                  textareaRefCallback={(el) => {
+                    playerTextareaRefs.current[slot] = el;
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          <div className="rounded-3xl border border-night-800/80 bg-night-950/50 px-6 py-4 text-night-300">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs text-night-500">문제 진행도</p>
+                <p className="text-lg font-semibold text-white">
+                  {activeMatch.current_index + 1} / {activeMatch.total_problems}
+                </p>
+              </div>
+              <div className="flex flex-1 justify-center">
+                <div
+                  className={`flex h-32 w-32 items-center justify-center rounded-full border-4 font-mono text-4xl sm:text-5xl ${
+                    isCountdownCritical ? "border-red-500 text-red-300" : "border-indigo-400 text-indigo-200"
+                  } bg-night-900/60`}
+                >
+                  {formattedRemaining}
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-night-500">남은 문제</p>
+                <p className="text-lg font-semibold text-white">
+                  {Math.max(0, activeMatch.total_problems - activeMatch.current_index - 1)}개
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-sm text-night-400">
+              <p className="text-[11px] uppercase tracking-[0.35em] text-night-600">문제 스코어</p>
+              <p className="text-2xl font-black text-white">
+                {problemWins.playerOne} : {problemWins.playerTwo}
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
       </>
     );
   }
