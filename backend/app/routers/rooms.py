@@ -531,14 +531,23 @@ async def _finalize_room(
     session.add(room)
     await session.commit()
 
-    await manager.broadcast_room(
-        room.id,
-        {
-            "type": "room_closed",
-            "room_id": room.id,
-            "reason": reason,
-        },
-    )
+        await manager.broadcast_room(
+            room.id,
+            {
+                "type": "notification",
+                "room_id": room.id,
+                "message": "방장이 나갔습니다. 방이 종료됩니다.",
+                "severity": "warning",
+            },
+        )
+        await manager.broadcast_room(
+            room.id,
+            {
+                "type": "room_closed",
+                "room_id": room.id,
+                "reason": reason,
+            },
+        )
 
 
 @router.post("/{room_id}/submit", response_model=dict)
