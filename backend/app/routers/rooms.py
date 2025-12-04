@@ -776,13 +776,14 @@ async def submit_expression(
     }
     await manager.broadcast_room(room.id, event_payload)
 
-    if submission.distance == 0 and submission.cost <= match.optimal_cost:
+    if submission.distance == 0:
+        reason = "optimal" if submission.cost <= match.optimal_cost else "target_hit"
         await _handle_problem_completion(
             session,
             room,
             match,
             game_service,
-            reason="optimal",
+            reason=reason,
             winner_submission=submission,
         )
         return event_payload

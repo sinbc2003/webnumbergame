@@ -951,7 +951,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               ? "기권승"
               : reason === "optimal"
                 ? "최적 연산기호 달성"
-                : "최종 판정";
+                : reason === "target_hit"
+                  ? "목표 달성"
+                  : "최종 판정";
         setLastWinReason(reasonLabel);
         if (winnerId === playerIdsRef.current.playerOne) {
           setScoreboard((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
@@ -968,7 +970,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               ? `${operatorCopy}시간 종료! 가장 효율적으로 승리했습니다.`
               : reason === "forfeit"
                 ? "상대가 나가 기권승으로 처리되었습니다."
-                : `${operatorCopy}승리했습니다!`;
+                : reason === "target_hit"
+                  ? `${operatorCopy}목표값을 정확히 맞췄습니다!`
+                  : `${operatorCopy}승리했습니다!`;
           setStatusMessage(message.trim());
           setStatusError(null);
           playTone("success");
@@ -982,7 +986,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               ? `${winnerLabel} 님이 ${operatorCopy}로 시간을 지배했습니다.`
               : reason === "forfeit"
                 ? `${winnerLabel} 님이 남아 있어 승리했습니다.`
-                : `${winnerLabel} 님이 ${operatorCopy}로 판정을 가져갔습니다.`;
+                : reason === "target_hit"
+                  ? `${winnerLabel} 님이 ${operatorCopy}로 목표값을 정확히 맞췄습니다.`
+                  : `${winnerLabel} 님이 ${operatorCopy}로 판정을 가져갔습니다.`;
           setStatusError(message);
           setStatusMessage(null);
           playTone("error");
@@ -1933,10 +1939,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 {roundOutcome.reason === "timeout"
                   ? "시간 종료 결과"
                   : roundOutcome.reason === "forfeit"
-                ? "기권 처리"
-                : roundOutcome.reason === "optimal"
-                  ? "최적 연산기호 달성"
-                  : "직전 라운드 결과"}
+                    ? "기권 처리"
+                    : roundOutcome.reason === "optimal"
+                      ? "최적 연산기호 달성"
+                      : roundOutcome.reason === "target_hit"
+                        ? "목표 달성 결과"
+                        : "직전 라운드 결과"}
               </p>
               <p className="mt-1">
                 승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
@@ -1980,7 +1988,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 ? "상대 기권 승리"
                 : roundOutcome.reason === "optimal"
                   ? "최적 연산기호 달성"
-                  : "라운드 결과"}
+                  : roundOutcome.reason === "target_hit"
+                    ? "목표 달성"
+                    : "라운드 결과"}
           </p>
           <p className="mt-1 text-night-300">
             승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
