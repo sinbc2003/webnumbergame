@@ -569,47 +569,43 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     const selections = relaySelections[teamKey];
     const columnLabel = teamKey === "teamA" ? slotLabels.playerOne : slotLabels.playerTwo;
     const assignedCount = selections.filter((value) => Boolean(value)).length;
+    const slotInfoLabel = (participant: Participant | null) => {
+      if (!participant?.team_label || typeof participant.order_index !== "number") return null;
+      const teamName = participant.team_label === RELAY_TEAM_A ? "A" : "B";
+      return `${teamName}팀 · ${participant.order_index + 1}번`;
+    };
     return (
-      <div className="rounded-2xl border border-night-900/60 bg-night-950/40 p-4 text-sm text-night-200">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">{columnLabel}</p>
-            <p className="text-xs text-night-500">
-              {assignedCount} / {relaySlotCount}명 배정
-            </p>
-          </div>
+      <div className="rounded-2xl border border-night-900/60 bg-night-950/40 p-4 text-xs text-night-200 sm:text-sm">
+        <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.3em] text-night-500">
+          <span>{columnLabel}</span>
+          <span>
+            {assignedCount} / {relaySlotCount}명
+          </span>
         </div>
-        <div className="mt-3 space-y-3">
+        <div className="mt-3 space-y-2">
           {selections.map((userId, index) => {
             const participant = userId ? participantMap.get(userId) ?? null : null;
             const options = buildRelayOptions(userId);
             const slotTitle = `${index + 1}번 슬롯`;
             const displayName = userId ? participantLabel(userId) : "비어 있음";
+            const meta = slotInfoLabel(participant);
             return (
               <div
                 key={`${teamKey}-${index}`}
-                className="rounded-xl border border-night-900/40 bg-night-900/30 p-3 text-sm text-night-200"
+                className="flex min-w-0 items-center gap-2 rounded-xl border border-night-900/40 bg-night-900/20 px-3 py-2 text-night-100"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">{slotTitle}</p>
-                    <p className="text-base font-semibold text-white">{displayName}</p>
-                    {participant?.team_label && typeof participant.order_index === "number" && (
-                      <p className="text-[11px] text-night-500">
-                        {participant.team_label === RELAY_TEAM_A ? "A" : "B"}팀 · {participant.order_index + 1}번 주자
-                      </p>
-                    )}
-                  </div>
-                  {participant?.is_ready && (
-                    <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
-                  )}
-                </div>
+                <span className="text-night-500">{slotTitle}</span>
+                <span className="flex-1 truncate font-semibold text-white">{displayName}</span>
+                {meta && <span className="hidden text-[11px] text-night-500 md:inline">{meta}</span>}
+                {participant?.is_ready && (
+                  <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
+                )}
                 {isHost ? (
                   <select
                     value={userId}
                     disabled={relaySaving}
                     onChange={(event) => handleRelaySlotChange(teamKey, index, event.target.value)}
-                    className="mt-2 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+                    className="w-32 rounded-md border border-night-800 bg-night-950 px-2 py-1 text-xs text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60 sm:text-sm"
                   >
                     {options.map((option) => (
                       <option
@@ -622,7 +618,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                     ))}
                   </select>
                 ) : (
-                  <p className="mt-2 text-[11px] text-night-500">방장이 배정합니다.</p>
+                  <span className="text-[11px] text-night-500">
+                    {displayName === "비어 있음" ? "배정 대기" : "배정됨"}
+                  </span>
                 )}
               </div>
             );
@@ -1707,21 +1705,23 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           </div>
         )}
         <div className="mt-3 flex flex-1 flex-col gap-3 overflow-hidden sm:mt-4">
-          <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-3 sm:p-4">
-            <div className="flex flex-wrap items-center justify-between text-[11px] uppercase tracking-[0.3em] text-night-500">
-              <span>플레이어 선택</span>
-              <span className="rounded-full border border-indigo-500/50 px-3 py-0.5 text-[10px] font-semibold text-indigo-200">
-                {isHost ? "HOST" : "관전자"}
-              </span>
-            </div>
-            <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto_1fr] md:items-center">
-              {slotSelectors[0]}
-              <div className="flex items-center justify-center rounded-2xl border border-night-800/50 bg-night-950/40 px-4 py-6 text-xs font-semibold tracking-[0.35em] text-night-400">
-                VS
+          {!isRelayRoom && (
+            <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-3 sm:p-4">
+              <div className="flex flex-wrap items-center justify-between text-[11px] uppercase tracking-[0.3em] text-night-500">
+                <span>플레이어 선택</span>
+                <span className="rounded-full border border-indigo-500/50 px-3 py-0.5 text-[10px] font-semibold text-indigo-200">
+                  {isHost ? "HOST" : "관전자"}
+                </span>
               </div>
-              {slotSelectors[1]}
+              <div className="mt-2 grid gap-2 md:grid-cols-[1fr_auto_1fr] md:items-center">
+                {slotSelectors[0]}
+                <div className="flex items-center justify-center rounded-2xl border border-night-800/50 bg-night-950/40 px-4 py-6 text-xs font-semibold tracking-[0.35em] text-night-400">
+                  VS
+                </div>
+                {slotSelectors[1]}
+              </div>
             </div>
-          </div>
+          )}
 
           {isRelayRoom && (
             <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-3 sm:p-4">
