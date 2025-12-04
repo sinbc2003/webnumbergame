@@ -295,6 +295,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerOne: null,
     playerTwo: null,
   });
+  const mySlotRef = useRef<BoardSlot | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -1200,7 +1201,11 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             break;
           }
           case "problem_advanced": {
-            setStatusMessage("다음 문제로 이동합니다. 확인 버튼을 눌러 주세요.");
+            if (mySlotRef.current) {
+              setStatusMessage("다음 문제로 이동합니다. 확인 버튼을 눌러 주세요.");
+            } else {
+              setStatusMessage(null);
+            }
             lastProblemSnapshotRef.current = null;
             setLatestCostBySlot({ playerOne: null, playerTwo: null });
             setBoards({
@@ -1518,6 +1523,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   }, [user?.id, playerOne, playerTwo]);
 
   useEffect(() => {
+    mySlotRef.current = mySlot;
     if (!mySlot) {
       setAdvancePrompt(null);
     }
@@ -2075,33 +2081,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
       {statusMessage && <p className="text-sm text-green-400">{statusMessage}</p>}
       {statusError && <p className="text-sm text-red-400">{statusError}</p>}
-
-      {roundOutcome && (
-        <div className="rounded-lg border border-night-800 bg-night-900/40 p-4 text-sm text-night-200">
-          <p className="font-semibold text-night-100">
-            {roundOutcome.reason === "timeout"
-              ? "시간 종료 결과"
-              : roundOutcome.reason === "forfeit"
-                ? "상대 기권 승리"
-                : roundOutcome.reason === "optimal"
-                  ? "최적 연산기호 달성"
-                  : roundOutcome.reason === "target_hit"
-                    ? "목표 달성"
-                    : "라운드 결과"}
-          </p>
-          <p className="mt-1 text-night-300">
-            승자: {roundOutcome.winnerId ? participantLabel(roundOutcome.winnerId ?? undefined) : "무승부"}
-          </p>
-          {typeof roundOutcome.operatorCount === "number" && (
-            <p className="text-xs text-night-500">연산기호 {roundOutcome.operatorCount}개</p>
-          )}
-          {roundOutcome.submittedAt && (
-            <p className="text-[11px] text-night-600">
-              제출 시각 {new Date(roundOutcome.submittedAt).toLocaleTimeString("ko-KR")}
-            </p>
-          )}
-        </div>
-      )}
 
       <div className="flex flex-wrap items-stretch gap-4 rounded-lg border border-night-800/60 bg-night-950/40 p-4 text-sm text-night-200">
         <div className="flex min-w-[150px] flex-col">
