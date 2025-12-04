@@ -328,6 +328,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerOne: 0,
     playerTwo: 0,
   });
+  const [problemWins, setProblemWins] = useState<{ playerOne: number; playerTwo: number }>({
+    playerOne: 0,
+    playerTwo: 0,
+  });
   const [latestCostBySlot, setLatestCostBySlot] = useState<{ playerOne: number | null; playerTwo: number | null }>({
     playerOne: null,
     playerTwo: null,
@@ -402,6 +406,22 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   });
 
   const activeMatch = data ?? null;
+  const applyActiveMatchPatch = useCallback(
+    (patch: Partial<ActiveMatch>) => {
+      mutate(
+        (current) => {
+          if (!current) {
+            return current;
+          }
+          const next = { ...current, ...patch };
+          activeMatchRef.current = next;
+          return next;
+        },
+        false,
+      );
+    },
+    [mutate],
+  );
   const hasActiveMatch = Boolean(activeMatch);
 
   useEffect(() => {
@@ -568,6 +588,15 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             {lastWinReason ? ` · ${lastWinReason}` : ""}
           </p>
         )}
+        <div className="mt-3 rounded-xl border border-night-900/60 bg-night-900/30 px-3 py-2 text-xs text-night-400">
+          <p className="uppercase tracking-[0.35em] text-night-600">Problem Score</p>
+          <p className="mt-1 text-2xl font-black text-white">
+            {problemWins.playerOne} : {problemWins.playerTwo}
+          </p>
+          <p className="text-[11px] text-night-500">
+            라운드 내 완료된 문제 승부 (A / B)
+          </p>
+        </div>
       </div>
     );
   };
@@ -925,8 +954,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         setLastWinReason(reasonLabel);
         if (winnerId === playerIdsRef.current.playerOne) {
           setScoreboard((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
+          setProblemWins((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
         } else if (winnerId === playerIdsRef.current.playerTwo) {
           setScoreboard((prev) => ({ ...prev, playerTwo: prev.playerTwo + 1 }));
+          setProblemWins((prev) => ({ ...prev, playerTwo: prev.playerTwo + 1 }));
         }
         if (winnerId === user?.id) {
           const operatorCopy =
@@ -1089,6 +1120,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             });
             setLatestCostBySlot({ playerOne: null, playerTwo: null });
             setScoreboard({ playerOne: 0, playerTwo: 0 });
+            setProblemWins({ playerOne: 0, playerTwo: 0 });
             setLastWinnerLabel(null);
             setLastWinReason(null);
             setStatusMessage("새 라운드가 시작되었습니다. 카운트다운 후 입력이 열립니다.");
@@ -1105,6 +1137,14 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             setStatusMessage("다음 문제로 이동했습니다.");
             lastProblemSnapshotRef.current = null;
             setLatestCostBySlot({ playerOne: null, playerTwo: null });
+            if (payload.problem_index !== undefined) {
+              applyActiveMatchPatch({
+                current_index: payload.problem_index,
+                target_number: payload.target_number ?? activeMatchRef.current?.target_number,
+                optimal_cost: payload.optimal_cost ?? activeMatchRef.current?.optimal_cost,
+                deadline: payload.deadline ?? activeMatchRef.current?.deadline,
+              });
+            }
             mutate();
             break;
           }
@@ -1370,6 +1410,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     return () => clearInterval(interval);
   }, [data?.deadline, parseDeadline]);
 
+  useEffect(() => {
+    if (remaining === 0 && hasActiveMatch) {
+      mutate();
+    }
+  }, [remaining, hasActiveMatch, mutate]);
+
   const mySlot: BoardSlot | null = useMemo(() => {
     if (!user?.id) return null;
     if (playerOne && user.id === playerOne) return "playerOne";
@@ -1506,6 +1552,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                     >
                       {formattedRemaining}
                     </div>
+                  </div>
+                  <div className="mt-3 text-center text-sm text-night-400">
+                    <p className="text-[11px] uppercase tracking-[0.35em] text-night-600">문제 스코어</p>
+                    <p className="text-2xl font-black text-white">
+                      {problemWins.playerOne} : {problemWins.playerTwo}
+                    </p>
                   </div>
                 </div>
                 <div className="order-2 ml-auto shrink-0 sm:order-3">{renderLeaveButton()}</div>
@@ -1691,6 +1743,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   {Math.max(0, activeMatch.total_problems - activeMatch.current_index - 1)}개
                 </p>
               </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-sm text-night-400">
+              <p className="text-[11px] uppercase tracking-[0.35em] text-night-600">문제 스코어</p>
+              <p className="text-2xl font-black text-white">
+                {problemWins.playerOne} : {problemWins.playerTwo}
+              </p>
             </div>
           </div>
         </div>
