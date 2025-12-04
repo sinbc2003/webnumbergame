@@ -1178,7 +1178,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       }
     };
     return () => ws.close();
-  }, [user, wsUrl, mutate, refreshRoomSnapshot, router, participantLabel, playTone, triggerPreCountdown]);
+  }, [user, wsUrl, mutate, refreshRoomSnapshot, router, participantLabel, playTone, triggerPreCountdown, matchupLabel]);
 
   useEffect(() => {
     if (!user?.id || !room.code) return;

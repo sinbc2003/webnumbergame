@@ -6,6 +6,13 @@ import { persist } from "zustand/middleware";
 import api, { setAuthToken } from "@/lib/api";
 import { User } from "@/types/api";
 
+type Setter = (
+  partial: AuthState | Partial<AuthState> | ((state: AuthState) => AuthState | Partial<AuthState>),
+  replace?: boolean,
+) => void;
+
+let setStateRef: Setter | null = null;
+
 interface AuthResponse {
   access_token: string;
   expires_at: string;
@@ -32,22 +39,17 @@ interface AuthState {
   register: (payload: RegisterPayload) => Promise<void>;
   adminLogin: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  hydrate: () => void;
 }
 
 export const useAuth = create<AuthState>()(
   persist(
     (set, get) => {
+      setStateRef = set;
       return {
         user: undefined,
         token: undefined,
         hydrated: false,
         loading: false,
-        hydrate: () => {
-          const token = get().token ?? null;
-          setAuthToken(token);
-          set({ hydrated: true });
-        },
         login: async ({ email, password }) => {
           set({ loading: true });
           try {
@@ -95,7 +97,12 @@ export const useAuth = create<AuthState>()(
       name: "number-game-auth",
       onRehydrateStorage: () => (state) => {
         setAuthToken(state?.token ?? null);
-        set({ hydrated: true });
+        setStateRef?.((current) => ({
+          ...current,
+          user: state?.user,
+          token: state?.token,
+          hydrated: true,
+        }));
       },
     }
   )
