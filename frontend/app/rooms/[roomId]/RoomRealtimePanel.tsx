@@ -243,11 +243,7 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
             {submitting ? "시작 중..." : "라운드 시작"}
           </button>
         </form>
-      ) : (
-        <div className="rounded-3xl border border-night-800/70 bg-night-950/30 p-5 text-night-300">
-          방장이 &quot;라운드 시작&quot;을 누르면 5 → 0 카운트다운이 재생된 뒤 경기 화면이 표시됩니다.
-        </div>
-      )}
+      ) : null}
 
       <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-5 flex h-[420px] lg:h-[60vh] flex-col overflow-hidden">
         <div className="flex items-center justify-between">

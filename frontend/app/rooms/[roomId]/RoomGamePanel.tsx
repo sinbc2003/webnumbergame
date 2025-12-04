@@ -555,10 +555,11 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       if (!userId) return "대기 중";
       const participant = participantState.find((p) => p.user_id === userId);
       if (participant?.username) return participant.username;
+      if (userId === user?.id && user?.username) return user.username;
       if (participant?.user_id) return `참가자 ${participant.user_id.slice(0, 6)}…`;
       return userId.slice(0, 6);
     },
-    [participantState],
+    [participantState, user?.id, user?.username],
   );
 
   const renderScoreboardPanel = (className = "") => {
