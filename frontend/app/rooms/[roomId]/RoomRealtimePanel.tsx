@@ -24,7 +24,7 @@ const resolveWsBase = () => {
 };
 
 const LOCKED_ROUND_NUMBER = 1;
-const DEFAULT_DURATION_MINUTES = 1;
+const DEFAULT_DURATION_MINUTES = 5;
 const DEFAULT_PROBLEM_COUNT = 3;
 const MIN_DURATION = 1;
 const MAX_DURATION = 30;
