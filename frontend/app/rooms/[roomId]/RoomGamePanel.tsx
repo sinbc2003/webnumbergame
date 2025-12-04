@@ -1392,69 +1392,83 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     return (
       <div className="min-h-screen bg-[#050a15] px-4 py-6 text-night-100">
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
-        <div className="mx-auto flex max-w-5xl flex-col gap-6">
-          <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-3xl border border-night-800/60 bg-night-950/70 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.65)]">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.45em] text-night-500">{roundLabel}</p>
-                  <p className="mt-3 text-4xl font-black text-white">
-                    문제 : {(activeMatch.current_index + 1).toString().padStart(2, "0")}
-                  </p>
-                  <p className="mt-2 text-sm text-night-400">
-                    목표값 <span className="font-semibold text-white">{activeMatch.target_number}</span>
-                  </p>
-                  <p className="text-sm text-night-400">
-                    최적 연산기호수 <span className="font-semibold text-white">{activeMatch.optimal_cost}</span>
-                  </p>
-                </div>
-                <div className="self-start">{renderLeaveButton()}</div>
-              </div>
-              <div className="mt-6 rounded-2xl border border-night-900/60 bg-night-900/30 p-4 text-xs text-night-400">
-                <p className="text-sm text-night-400">
-                  현재 플레이어 <span className="font-semibold text-white">{participantLabel(assignedUser)}</span>
-                </p>
-              </div>
-            </div>
-            <div className="rounded-3xl border border-night-800/60 bg-night-950/60 p-6">
-              <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">값 · 연산</p>
-              <div className="mt-3 grid grid-cols-2 gap-4 text-night-200">
-                <div>
-                  <p className="text-sm text-night-500">값</p>
-                  <p className="text-3xl font-black text-white">{expressionValueDisplay}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-night-500">연산기호 개수</p>
-                  <p className="text-3xl font-black text-white">{operatorCountDisplay}</p>
-                </div>
-              </div>
-              <div className="mt-6">
-                <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-night-500">
-                  <span role="img" aria-label="trophy">
-                    🏆
-                  </span>{" "}
-                  최고 기록
-                </p>
-                <div className="mt-2 max-h-48 overflow-y-auto rounded-2xl border border-night-900/50 bg-night-900/30 p-3 text-xs leading-relaxed">
-                  {historyItems.length === 0 ? (
-                    <p className="text-night-500">아직 기록이 없습니다.</p>
-                  ) : (
-                    historyItems.map((entry, index) => (
-                      <div
-                        key={`${entry.timestamp}-${index}`}
-                        className="flex items-center justify-between border-b border-night-900/40 py-2 last:border-none"
-                      >
-                        <span className="break-all font-mono text-sm text-white">{entry.expression}</span>
-                        <span className="text-night-400">{entry.score}점</span>
-                      </div>
-                    ))
-                  )}
-                </div>
+        <div className="mx-auto flex max-w-5xl flex-col gap-5">
+          <div className="flex justify-center">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <p className="text-[10px] uppercase tracking-[0.4em] text-night-500">남은 시간</p>
+              <div
+                className={`rounded-full border px-8 py-3 text-4xl font-black ${
+                  isCountdownCritical ? "border-red-500 text-red-300" : "border-indigo-400 text-white"
+                } bg-night-900/60`}
+              >
+                {formattedRemaining}
               </div>
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-night-800/70 bg-night-950/70 p-4 shadow-[0_25px_70px_rgba(0,0,0,0.6)]">
+          <div className="grid gap-4 md:grid-cols-[1.35fr_0.65fr]">
+            <div className="rounded-3xl border border-night-800/60 bg-night-950/70 p-4 shadow-[0_25px_70px_rgba(0,0,0,0.6)] sm:p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-3">
+                  <p className="text-[11px] uppercase tracking-[0.45em] text-night-500">{roundLabel}</p>
+                  <div className="grid gap-4 text-white sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs text-night-500">목표값</p>
+                      <p className="text-4xl font-black text-white">{activeMatch.target_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-night-500">최적 연산기호수</p>
+                      <p className="text-4xl font-black text-white">{activeMatch.optimal_cost}</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-night-400">
+                    {activeMatch.current_index + 1} / {activeMatch.total_problems} 문제 진행 중
+                  </p>
+                  <div className="grid gap-3 text-night-200 sm:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">값</p>
+                      <p className="text-2xl font-bold text-white">{expressionValueDisplay}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">연산기호</p>
+                      <p className="text-2xl font-bold text-white">{operatorCountDisplay}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="self-start">{renderLeaveButton()}</div>
+              </div>
+              <div className="mt-4 rounded-2xl border border-night-900/60 bg-night-900/30 p-3 text-xs text-night-300">
+                <p className="text-sm text-night-300">
+                  현재 플레이어 <span className="font-semibold text-white">{participantLabel(assignedUser)}</span>
+                </p>
+              </div>
+            </div>
+            <div className="rounded-3xl border border-night-800/60 bg-night-950/60 p-4 sm:p-5">
+              <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-night-500">
+                <span role="img" aria-label="trophy">
+                  🏆
+                </span>
+                최고 기록
+              </p>
+              <div className="mt-3 max-h-40 overflow-y-auto rounded-2xl border border-night-900/50 bg-night-900/30 p-3 text-xs leading-relaxed">
+                {historyItems.length === 0 ? (
+                  <p className="text-night-500">아직 기록이 없습니다.</p>
+                ) : (
+                  historyItems.map((entry, index) => (
+                    <div
+                      key={`${entry.timestamp}-${index}`}
+                      className="flex items-center justify-between border-b border-night-900/40 py-2 last:border-none"
+                    >
+                      <span className="break-all font-mono text-sm text-white">{entry.expression}</span>
+                      <span className="text-night-400">{entry.score}점</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-night-800/70 bg-night-950/70 p-5 shadow-[0_25px_70px_rgba(0,0,0,0.6)] sm:p-6">
             <PlayerPanel
               key={mySlot}
               title={`${slotLabels.playerOne}`}
@@ -1470,6 +1484,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               placeholder="예: (1+1)*1"
               warningMessage={inputWarnings[mySlot]}
               focusLayout
+              emphasizeInput
               textareaRefCallback={(el) => {
                 playerTextareaRefs.current[mySlot] = el;
               }}
@@ -1479,11 +1494,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <div className="text-emerald-300">{statusMessage && <>• {statusMessage}</>}</div>
             <div className="text-red-400">{statusError && <>• {statusError}</>}</div>
-            <div className="ml-auto flex items-center gap-3">
-              <div className="rounded-full border border-indigo-400/50 px-6 py-2 text-3xl font-black text-white">
-                {formattedRemaining}
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -2153,6 +2163,7 @@ interface PlayerPanelProps {
   warningMessage?: string | null;
   focusLayout?: boolean;
   textareaRefCallback?: (el: HTMLTextAreaElement | null) => void;
+  emphasizeInput?: boolean;
 }
 
 function PlayerPanel({
@@ -2170,6 +2181,7 @@ function PlayerPanel({
   warningMessage,
   focusLayout,
   textareaRefCallback,
+  emphasizeInput = false,
 }: PlayerPanelProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -2194,7 +2206,9 @@ function PlayerPanel({
           }, null);
     return (
       <div className="flex flex-1 flex-col gap-6 lg:flex-row">
-        <div className="flex-1 rounded-[32px] border-2 border-indigo-600/40 bg-night-950/60 p-6 text-night-100 shadow-[0_25px_90px_rgba(0,0,0,0.6)]">
+        <div
+          className={`flex-1 rounded-[32px] border-2 border-indigo-600/40 bg-night-950/60 ${emphasizeInput ? "p-7" : "p-6"} text-night-100 shadow-[0_25px_90px_rgba(0,0,0,0.6)]`}
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-indigo-200/80">{title}</p>
@@ -2216,7 +2230,9 @@ function PlayerPanel({
             spellCheck={false}
             autoComplete="off"
             ref={textareaRefCallback}
-            className="mt-6 min-h-[160px] w-full flex-1 rounded-2xl border-2 border-indigo-500/40 bg-night-900 px-4 py-4 font-mono text-2xl text-white focus:border-indigo-300 focus:outline-none"
+            className={`mt-6 w-full flex-1 rounded-2xl border-2 border-indigo-500/40 bg-night-900 px-4 py-4 font-mono text-white focus:border-indigo-300 focus:outline-none ${
+              emphasizeInput ? "min-h-[220px] text-3xl" : "min-h-[160px] text-2xl"
+            }`}
           />
           {warningMessage && <p className="mt-2 text-sm text-amber-200/90">{warningMessage}</p>}
           {isMine && onSubmit && (
@@ -2224,7 +2240,9 @@ function PlayerPanel({
               type="button"
               onClick={onSubmit}
               disabled={disabled || submitting || !expression.trim()}
-              className="mt-4 h-14 w-full rounded-2xl bg-indigo-600 text-lg font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700"
+              className={`mt-4 w-full rounded-2xl bg-indigo-600 font-semibold text-white transition hover:bg-indigo-500 disabled:bg-night-700 ${
+                emphasizeInput ? "h-16 text-xl" : "h-14 text-lg"
+              }`}
             >
               {submitting ? "제출 중..." : "제출하기"}
             </button>
