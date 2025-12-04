@@ -1319,6 +1319,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   };
 
   const isPlayerView = hasActiveMatch && Boolean(mySlot);
+  const isSimplifiedSoloView = isPlayerView && !isTeamRound && teamSize === 1;
   const visibleSlots: BoardSlot[] = isPlayerView && mySlot ? [mySlot] : (["playerOne", "playerTwo"] as BoardSlot[]);
   const myBoard = mySlot ? boards[mySlot] : null;
   const myExpression = myBoard?.expression ?? "";
@@ -1348,6 +1349,106 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     : hasActiveMatch
       ? "fixed inset-0 z-40 overflow-y-auto bg-[#050a15]/95 p-6 space-y-4"
       : lobbyShellClass;
+
+  if (isSimplifiedSoloView && activeMatch && mySlot) {
+    const assignedUser = mySlot === "playerOne" ? playerOne : playerTwo;
+    const historyItems =
+      myHistory.length > 0 ? [...myHistory].slice(-6).reverse() : [];
+    return (
+      <div className="min-h-screen bg-[#050a15] px-4 py-6 text-night-100">
+        {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
+        <div className="mx-auto flex max-w-5xl flex-col gap-6">
+          <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-3xl border border-night-800/60 bg-night-950/70 p-6 shadow-[0_30px_80px_rgba(0,0,0,0.65)]">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.45em] text-night-500">{roundLabel}</p>
+                  <p className="mt-3 text-4xl font-black text-white">
+                    문제 : {(activeMatch.current_index + 1).toString().padStart(2, "0")}
+                  </p>
+                  <p className="mt-2 text-sm text-night-400">
+                    목표값 <span className="font-semibold text-white">{activeMatch.target_number}</span>
+                  </p>
+                </div>
+                <div className="self-start">{renderLeaveButton()}</div>
+              </div>
+              <div className="mt-6 rounded-2xl border border-night-900/60 bg-night-900/30 p-4 text-xs text-night-400">
+                <p>방 코드 {room.code}</p>
+                <p className="mt-1">
+                  현재 플레이어 <span className="font-semibold text-white">{participantLabel(assignedUser)}</span>
+                </p>
+              </div>
+            </div>
+            <div className="rounded-3xl border border-night-800/60 bg-night-950/60 p-6">
+              <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">값 · 연산</p>
+              <div className="mt-3 grid grid-cols-2 gap-4 text-night-200">
+                <div>
+                  <p className="text-sm text-night-500">값</p>
+                  <p className="text-3xl font-black text-white">{expressionValueDisplay}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-night-500">연산기호 개수</p>
+                  <p className="text-3xl font-black text-white">{operatorCountDisplay}</p>
+                </div>
+              </div>
+              <div className="mt-6">
+                <p className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-night-500">
+                  <span role="img" aria-label="trophy">
+                    🏆
+                  </span>{" "}
+                  최고 기록
+                </p>
+                <div className="mt-2 max-h-48 overflow-y-auto rounded-2xl border border-night-900/50 bg-night-900/30 p-3 text-xs leading-relaxed">
+                  {historyItems.length === 0 ? (
+                    <p className="text-night-500">아직 기록이 없습니다.</p>
+                  ) : (
+                    historyItems.map((entry, index) => (
+                      <div
+                        key={`${entry.timestamp}-${index}`}
+                        className="flex items-center justify-between border-b border-night-900/40 py-2 last:border-none"
+                      >
+                        <span className="font-mono text-sm text-white">{entry.expression}</span>
+                        <span className="text-night-400">{entry.score}점</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[32px] border border-night-800/70 bg-night-950/70 p-4 shadow-[0_25px_70px_rgba(0,0,0,0.6)]">
+            <PlayerPanel
+              key={mySlot}
+              title={`${slotLabels.playerOne}`}
+              userLabel={participantLabel(assignedUser)}
+              expression={boards[mySlot].expression}
+              history={boards[mySlot].history}
+              onExpressionChange={(value) => handleExpressionChange(mySlot, value)}
+              onSubmit={() => submitExpression(mySlot)}
+              onFocus={armAudio}
+              disabled={!activeMatch || !assignedUser}
+              isMine
+              submitting={submittingSlot === mySlot}
+              placeholder="예: (1+1)*1"
+              warningMessage={inputWarnings[mySlot]}
+              focusLayout
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="text-emerald-300">{statusMessage && <>• {statusMessage}</>}</div>
+            <div className="text-red-400">{statusError && <>• {statusError}</>}</div>
+            <div className="ml-auto flex items-center gap-3">
+              <div className="rounded-full border border-indigo-400/50 px-6 py-2 text-3xl font-black text-white">
+                {formattedRemaining}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isPlayerView && activeMatch) {
     return (
