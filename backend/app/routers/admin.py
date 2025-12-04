@@ -1,11 +1,14 @@
+import csv
+import io
 from typing import Sequence
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import delete as sa_delete, func, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_session
 from ..dependencies import get_admin_user
+from ..enums import RoundType
 from ..events.manager import manager
 from ..models import (
     Match,
@@ -61,6 +64,93 @@ async def create_problem(payload: ProblemCreate, session: AsyncSession = Depends
     await session.commit()
     await session.refresh(problem)
     return ProblemPublic.model_validate(problem)
+
+
+def _normalize_header(value: str) -> str:
+    return value.strip().lower().replace(" ", "").replace("_", "")
+
+
+TARGET_HEADER_CANDIDATES = {"targetnumber", "target", "goal", "목표값"}
+COST_HEADER_CANDIDATES = {"optimalcost", "cost", "mincost", "최소cost", "minimalcost"}
+
+
+@router.post("/problems/import", status_code=status.HTTP_201_CREATED)
+async def import_problems(
+    round_type: RoundType = RoundType.ROUND1_INDIVIDUAL,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    if file.content_type not in {None, "text/csv", "application/vnd.ms-excel", "application/csv"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV 파일을 업로드해 주세요.")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="비어 있는 파일입니다.")
+
+    decoded = None
+    for encoding in ("utf-8-sig", "utf-8", "cp949"):
+        try:
+            decoded = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if decoded is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="지원하지 않는 인코딩입니다.")
+
+    reader = csv.reader(io.StringIO(decoded))
+    try:
+        headers = next(reader)
+    except StopIteration:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="헤더가 없습니다.")
+
+    normalized_headers = [_normalize_header(header) for header in headers]
+    try:
+        target_idx = next(i for i, header in enumerate(normalized_headers) if header in TARGET_HEADER_CANDIDATES)
+    except StopIteration:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="목표값 헤더가 필요합니다. (예: '목표값')")
+    try:
+        cost_idx = next(i for i, header in enumerate(normalized_headers) if header in COST_HEADER_CANDIDATES)
+    except StopIteration:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="최소 cost 헤더가 필요합니다. (예: '최소cost')")
+
+    problems: list[Problem] = []
+    errors: list[str] = []
+    for row_number, row in enumerate(reader, start=2):
+        if not row or all(not cell.strip() for cell in row):
+            continue
+        if max(target_idx, cost_idx) >= len(row):
+            errors.append(f"{row_number}행: 열의 수가 부족합니다.")
+            continue
+        try:
+            target_value = int(row[target_idx])
+            optimal_cost = int(row[cost_idx])
+        except ValueError:
+            errors.append(f"{row_number}행: 숫자가 아닌 값이 포함되어 있습니다.")
+            continue
+        if target_value <= 0 or optimal_cost <= 0:
+            errors.append(f"{row_number}행: 목표값과 최소 cost는 0보다 커야 합니다.")
+            continue
+        problems.append(
+            Problem(
+                round_type=round_type,
+                target_number=target_value,
+                optimal_cost=optimal_cost,
+            )
+        )
+
+    if not problems:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="유효한 문제가 없습니다. CSV 내용을 확인해 주세요.",
+        )
+
+    session.add_all(problems)
+    await session.commit()
+
+    return {
+        "imported": len(problems),
+        "errors": errors,
+    }
 
 
 @router.put("/problems/{problem_id}", response_model=ProblemPublic)
