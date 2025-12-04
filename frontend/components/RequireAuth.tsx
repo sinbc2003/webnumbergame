@@ -12,14 +12,14 @@ interface Props {
 export default function RequireAuth({ children }: Props) {
   const router = useRouter();
   const { user, hydrated } = useAuth();
-  const [ready, setReady] = useState(() => useAuth.persist.hasHydrated?.() ?? false);
+  const [ready, setReady] = useState(() => useAuth.persist?.hasHydrated?.() ?? false);
 
   useEffect(() => {
-    if (useAuth.persist.hasHydrated?.()) {
+    if (useAuth.persist?.hasHydrated?.()) {
       setReady(true);
       return;
     }
-    const unsub = useAuth.persist.onFinishHydration?.(() => {
+    const unsub = useAuth.persist?.onFinishHydration?.(() => {
       setReady(true);
     });
     return () => {
