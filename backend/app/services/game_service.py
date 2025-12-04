@@ -5,9 +5,12 @@ from sqlalchemy import case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from ..config import get_settings
 from ..enums import MatchStatus, RoundType
 from ..game.engine import NumberGameEngine
 from ..models import Match, Room, Submission, User
+
+settings = get_settings()
 
 
 class GameService:
@@ -25,7 +28,8 @@ class GameService:
         duration_minutes: int,
         metadata: dict | None = None,
     ) -> Match:
-        deadline = datetime.utcnow() + timedelta(minutes=duration_minutes)
+        delay = timedelta(seconds=settings.round_start_delay_seconds)
+        deadline = datetime.utcnow() + timedelta(minutes=duration_minutes) + delay
         match = Match(
             room_id=room.id,
             round_type=room.round_type,

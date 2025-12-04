@@ -28,7 +28,7 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const hostId = room.host_id;
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
   const [roundNumber, setRoundNumber] = useState(room.current_round);
-  const [durationMinutes, setDurationMinutes] = useState(3);
+  const [durationMinutes, setDurationMinutes] = useState(5);
   const [problemCount, setProblemCount] = useState(5);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

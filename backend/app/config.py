@@ -50,7 +50,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./number_game.db"
     redis_url: str | None = None
     cors_origins_raw: str | None = Field(default=None, alias="CORS_ORIGINS")
-    default_round_minutes: int = 3
+    default_round_minutes: int = 5
+    round_start_delay_seconds: int = 5
     leaderboard_window_hours: int = 24
     max_room_capacity: int = 16
     db_init_max_retries: int = 5
