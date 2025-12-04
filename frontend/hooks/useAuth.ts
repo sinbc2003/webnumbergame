@@ -26,6 +26,7 @@ interface RegisterPayload {
 interface AuthState {
   user?: User;
   token?: string;
+  hydrated: boolean;
   loading: boolean;
   login: (credentials: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
@@ -40,10 +41,12 @@ export const useAuth = create<AuthState>()(
       return {
         user: undefined,
         token: undefined,
+        hydrated: false,
         loading: false,
         hydrate: () => {
           const token = get().token ?? null;
           setAuthToken(token);
+          set({ hydrated: true });
         },
         login: async ({ email, password }) => {
           set({ loading: true });
@@ -53,7 +56,7 @@ export const useAuth = create<AuthState>()(
               password,
             });
             setAuthToken(data.access_token);
-            set({ user: data.user, token: data.access_token });
+            set({ user: data.user, token: data.access_token, hydrated: true });
           } finally {
             set({ loading: false });
           }
@@ -67,7 +70,7 @@ export const useAuth = create<AuthState>()(
               password,
             });
             setAuthToken(data.access_token);
-            set({ user: data.user, token: data.access_token });
+            set({ user: data.user, token: data.access_token, hydrated: true });
           } finally {
             set({ loading: false });
           }
@@ -77,23 +80,22 @@ export const useAuth = create<AuthState>()(
           try {
             const { data } = await api.post<AuthResponse>("/auth/admin/login", { username, password });
             setAuthToken(data.access_token);
-            set({ user: data.user, token: data.access_token });
+            set({ user: data.user, token: data.access_token, hydrated: true });
           } finally {
             set({ loading: false });
           }
         },
         logout: () => {
           setAuthToken(null);
-          set({ user: undefined, token: undefined });
+          set({ user: undefined, token: undefined, hydrated: true });
         },
       };
     },
     {
       name: "number-game-auth",
       onRehydrateStorage: () => (state) => {
-        if (state?.token) {
-          setAuthToken(state.token);
-        }
+        setAuthToken(state?.token ?? null);
+        set({ hydrated: true });
       },
     }
   )
