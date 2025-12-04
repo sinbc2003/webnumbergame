@@ -613,7 +613,8 @@ async def _handle_problem_completion(
     winner_submission: Submission | None,
     winner_user_id: str | None = None,
 ) -> None:
-    metadata = match.metadata_snapshot or {}
+    metadata_source = match.metadata_snapshot or {}
+    metadata = dict(metadata_source)
     problems = metadata.get("problems") or [
         {"target_number": match.target_number, "optimal_cost": match.optimal_cost}
     ]
@@ -672,7 +673,7 @@ async def _handle_problem_completion(
     match.optimal_cost = next_problem["optimal_cost"]
     transition_delay = timedelta(seconds=settings.round_start_delay_seconds)
     match.deadline = datetime.utcnow() + timedelta(minutes=duration_minutes) + transition_delay
-    match.metadata_snapshot = metadata
+    match.metadata_snapshot = dict(metadata)
     match.started_at = datetime.utcnow()
     match.winning_submission_id = None
 
