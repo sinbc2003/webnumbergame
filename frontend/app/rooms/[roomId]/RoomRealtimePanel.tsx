@@ -23,13 +23,14 @@ const resolveWsBase = () => {
   return trimmed.replace(/^http/, "ws");
 };
 
+const LOCKED_ROUND_NUMBER = 1;
+const LOCKED_DURATION_MINUTES = 1;
+const LOCKED_PROBLEM_COUNT = 3;
+
 export default function RoomRealtimePanel({ room, participants }: Props) {
   const roomId = room.id;
   const hostId = room.host_id;
   const wsUrl = useMemo(() => `${resolveWsBase()}/ws/rooms/${roomId}`, [roomId]);
-  const [roundNumber, setRoundNumber] = useState(room.current_round);
-  const [durationMinutes, setDurationMinutes] = useState(5);
-  const [problemCount, setProblemCount] = useState(5);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -40,10 +41,6 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const { user } = useAuth();
   const router = useRouter();
   const isHost = user?.id === hostId;
-
-  useEffect(() => {
-    setRoundNumber(room.current_round);
-  }, [room.current_round]);
 
   useEffect(() => {
     setPlayerOne(room.player_one_id ?? undefined);
@@ -148,11 +145,11 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
     setSuccess(null);
     try {
       await api.post(`/rooms/${roomId}/rounds`, {
-        round_number: Number(roundNumber),
-        duration_minutes: durationMinutes ? Number(durationMinutes) : undefined,
-        problem_count: Number(problemCount),
+        round_number: LOCKED_ROUND_NUMBER,
+        duration_minutes: LOCKED_DURATION_MINUTES,
+        problem_count: LOCKED_PROBLEM_COUNT,
       });
-      setSuccess("등록된 문제에서 무작위로 라운드를 시작했습니다.");
+      setSuccess("1라운드(3문제 · 문제당 1분) 매치가 시작되었습니다.");
     } catch (err: any) {
       const detail = err?.response?.data?.detail ?? "라운드 시작에 실패했습니다.";
       setError(detail);
@@ -197,41 +194,17 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
           onSubmit={handleStartRound}
           className="rounded-3xl border border-night-800/70 bg-night-950/45 p-5 text-night-200"
         >
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <label className="space-y-1 text-night-400">
-              <span>라운드 번호</span>
-              <input
-                type="number"
-                min={1}
-                max={99}
-                value={roundNumber}
-                onChange={(e) => setRoundNumber(Number(e.target.value))}
-                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
-                required
-              />
-            </label>
-            <label className="space-y-1 text-night-400">
-              <span>진행 시간(분)</span>
-              <input
-                type="number"
-                min={1}
-                max={30}
-                value={durationMinutes}
-                onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
-              />
-            </label>
-            <label className="space-y-1 text-night-400">
-              <span>문제 개수</span>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={problemCount}
-                onChange={(e) => setProblemCount(Number(e.target.value))}
-                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
-              />
-            </label>
+          <div className="mt-4 rounded-2xl border border-night-900/60 bg-night-900/20 p-4 text-sm text-night-300">
+            <p className="text-base font-semibold text-white">고정된 라운드 설정</p>
+            <p className="mt-1 text-xs text-night-500">
+              현재는 라운드/시간/문제 수를 변경할 수 없으며 아래 설정으로만 진행됩니다.
+            </p>
+            <ul className="mt-3 space-y-1 text-night-200">
+              <li>· 라운드 수: {LOCKED_ROUND_NUMBER}회</li>
+              <li>· 문제 수: {LOCKED_PROBLEM_COUNT}문제</li>
+              <li>· 문제당 제한 시간: {LOCKED_DURATION_MINUTES}분</li>
+              <li>· 모든 플레이어는 다음 문제 안내 후 확인 버튼을 눌러야 합니다.</li>
+            </ul>
           </div>
           {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
           {success && <p className="mt-1 text-sm text-emerald-300">{success}</p>}

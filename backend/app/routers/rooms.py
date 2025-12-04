@@ -34,6 +34,10 @@ from ..services.room_service import RoomService
 router = APIRouter(prefix="/rooms", tags=["rooms"])
 settings = get_settings()
 
+LOCKED_ROUND_NUMBER = 1
+LOCKED_PROBLEM_COUNT = 3
+LOCKED_PROBLEM_DURATION_MINUTES = 1
+
 
 def _participant_to_public(participant: RoomParticipant, username: str) -> ParticipantPublic:
     payload = participant.model_dump()
@@ -461,8 +465,25 @@ async def start_round(
             detail="두 플레이어가 지정되어야 합니다.",
         )
 
-    duration = payload.duration_minutes or settings.default_round_minutes
-    problem_count = payload.problem_count or 5
+    if payload.round_number != LOCKED_ROUND_NUMBER:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="현재는 1라운드 모드만 지원합니다.",
+        )
+    if payload.problem_count != LOCKED_PROBLEM_COUNT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="문제 수는 3개로 고정되어 있습니다.",
+        )
+    if payload.duration_minutes not in (None, LOCKED_PROBLEM_DURATION_MINUTES):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="문제 제한 시간은 1분으로 고정되어 있습니다.",
+        )
+
+    duration = LOCKED_PROBLEM_DURATION_MINUTES
+    problem_count = LOCKED_PROBLEM_COUNT
+    round_number = LOCKED_ROUND_NUMBER
 
     statement = (
         select(Problem)
@@ -492,7 +513,7 @@ async def start_round(
         room=room,
         target_number=first["target_number"],
         optimal_cost=first["optimal_cost"],
-        round_number=payload.round_number,
+        round_number=round_number,
         duration_minutes=duration,
         metadata=metadata,
     )
@@ -649,7 +670,8 @@ async def _handle_problem_completion(
     metadata["current_index"] = next_index
     match.target_number = next_problem["target_number"]
     match.optimal_cost = next_problem["optimal_cost"]
-    match.deadline = datetime.utcnow() + timedelta(minutes=duration_minutes)
+    transition_delay = timedelta(seconds=settings.round_start_delay_seconds)
+    match.deadline = datetime.utcnow() + timedelta(minutes=duration_minutes) + transition_delay
     match.metadata_snapshot = metadata
     match.started_at = datetime.utcnow()
     match.winning_submission_id = None
@@ -686,12 +708,18 @@ async def _maybe_finish_expired_match(
         return
 
     best_submission = await game_service.get_best_submission(match.id)
+    resolved_reason = "timeout"
+    if best_submission:
+        if best_submission.is_optimal:
+            resolved_reason = "optimal"
+        elif best_submission.distance == 0:
+            resolved_reason = "target_hit"
     await _handle_problem_completion(
         session,
         room,
         match,
         game_service,
-        reason="timeout",
+        reason=resolved_reason,
         winner_submission=best_submission,
     )
 
@@ -776,14 +804,13 @@ async def submit_expression(
     }
     await manager.broadcast_room(room.id, event_payload)
 
-    if submission.distance == 0:
-        reason = "optimal" if submission.cost <= match.optimal_cost else "target_hit"
+    if submission.is_optimal:
         await _handle_problem_completion(
             session,
             room,
             match,
             game_service,
-            reason=reason,
+            reason="optimal",
             winner_submission=submission,
         )
         return event_payload

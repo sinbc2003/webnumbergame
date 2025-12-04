@@ -72,7 +72,7 @@ class JoinRoomRequest(BaseModel):
 class StartRoundRequest(BaseModel):
     round_number: int = 1
     duration_minutes: int | None = None
-    problem_count: int = Field(default=5, ge=1, le=10)
+    problem_count: int = Field(default=3, ge=1, le=10)
 
 
 class PlayerAssignmentRequest(BaseModel):
