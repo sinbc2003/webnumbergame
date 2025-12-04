@@ -407,7 +407,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       return data;
     } catch (err: any) {
       const status = err?.response?.status;
-      if (status && [403, 404, 409, 410].includes(status)) {
+      if (!status || [403, 404, 409, 410].includes(status)) {
         return null;
       }
       throw err;
