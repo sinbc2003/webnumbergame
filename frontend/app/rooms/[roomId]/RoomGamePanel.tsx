@@ -932,15 +932,16 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             const slot = slotFromUserId(payload.submission.user_id);
             if (slot) {
               setBoards((prev) => {
-                const nextHistory: HistoryEntry[] = [
-                  {
-                    expression: payload.submission!.expression,
-                    score: payload.submission!.score,
-                    value: payload.submission!.result_value ?? null,
-                    timestamp: new Date().toISOString(),
-                  },
-                  ...prev[slot].history,
-                ].slice(0, 10);
+                const entry: HistoryEntry = {
+                  expression: payload.submission!.expression,
+                  score: payload.submission!.score,
+                  value: payload.submission!.result_value ?? null,
+                  timestamp: new Date().toISOString(),
+                };
+                const shouldRecord = allowHistory(entry);
+                const nextHistory: HistoryEntry[] = shouldRecord
+                  ? [entry, ...prev[slot].history].slice(0, 10)
+                  : prev[slot].history;
                 return {
                   ...prev,
                   [slot]: { ...prev[slot], history: nextHistory },
@@ -1324,6 +1325,16 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const myBoard = mySlot ? boards[mySlot] : null;
   const myExpression = myBoard?.expression ?? "";
   const myHistory = myBoard?.history ?? [];
+  const allowHistory = (entry: HistoryEntry | null) => {
+    if (!entry) return false;
+    if (!hasActiveMatch) return false;
+    const match = activeMatch || activeMatchRef.current;
+    if (!match) return false;
+    if (typeof entry.value !== "number") return false;
+    const isTargetMatched = entry.value === match.target_number;
+    const isOptimal = entry.score >= 0 && entry.score !== null && entry.score !== undefined && entry.score > 0;
+    return isTargetMatched || isOptimal;
+  };
   const expressionValue = useMemo(() => computeExpressionValue(myExpression), [myExpression]);
   const operatorCount = useMemo(() => countOperators(myExpression), [myExpression]);
   const expressionValueDisplay = myExpression.trim() ? expressionValue ?? "-" : "-";
@@ -1353,7 +1364,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   if (isSimplifiedSoloView && activeMatch && mySlot) {
     const assignedUser = mySlot === "playerOne" ? playerOne : playerTwo;
     const historyItems =
-      myHistory.length > 0 ? [...myHistory].slice(-6).reverse() : [];
+      myHistory.length > 0 ? [...myHistory].filter((entry) => allowHistory(entry)).slice(-6).reverse() : [];
     return (
       <div className="min-h-screen bg-[#050a15] px-4 py-6 text-night-100">
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
@@ -1368,6 +1379,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   </p>
                   <p className="mt-2 text-sm text-night-400">
                     목표값 <span className="font-semibold text-white">{activeMatch.target_number}</span>
+                  </p>
+                  <p className="text-sm text-night-400">
+                    최적 연산기호수 <span className="font-semibold text-white">{activeMatch.optimal_cost}</span>
                   </p>
                 </div>
                 <div className="self-start">{renderLeaveButton()}</div>
