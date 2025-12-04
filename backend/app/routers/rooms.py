@@ -35,8 +35,12 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 settings = get_settings()
 
 LOCKED_ROUND_NUMBER = 1
-LOCKED_PROBLEM_COUNT = 3
-LOCKED_PROBLEM_DURATION_MINUTES = 1
+DEFAULT_PROBLEM_COUNT = 3
+DEFAULT_PROBLEM_DURATION_MINUTES = 1
+MIN_PROBLEM_COUNT = 1
+MAX_PROBLEM_COUNT = 10
+MIN_PROBLEM_DURATION_MINUTES = 1
+MAX_PROBLEM_DURATION_MINUTES = 30
 PROBLEM_TRANSITION_DELAY_SECONDS = 1
 
 
@@ -471,20 +475,21 @@ async def start_round(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="현재는 1라운드 모드만 지원합니다.",
         )
-    if payload.problem_count != LOCKED_PROBLEM_COUNT:
+    round_number = LOCKED_ROUND_NUMBER
+
+    problem_count = payload.problem_count or DEFAULT_PROBLEM_COUNT
+    if not (MIN_PROBLEM_COUNT <= problem_count <= MAX_PROBLEM_COUNT):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="문제 수는 3개로 고정되어 있습니다.",
-        )
-    if payload.duration_minutes not in (None, LOCKED_PROBLEM_DURATION_MINUTES):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="문제 제한 시간은 1분으로 고정되어 있습니다.",
+            detail=f"문제 수는 {MIN_PROBLEM_COUNT}~{MAX_PROBLEM_COUNT} 범위여야 합니다.",
         )
 
-    duration = LOCKED_PROBLEM_DURATION_MINUTES
-    problem_count = LOCKED_PROBLEM_COUNT
-    round_number = LOCKED_ROUND_NUMBER
+    duration = payload.duration_minutes or DEFAULT_PROBLEM_DURATION_MINUTES
+    if not (MIN_PROBLEM_DURATION_MINUTES <= duration <= MAX_PROBLEM_DURATION_MINUTES):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"문제 제한 시간은 {MIN_PROBLEM_DURATION_MINUTES}~{MAX_PROBLEM_DURATION_MINUTES}분 범위여야 합니다.",
+        )
 
     statement = (
         select(Problem)

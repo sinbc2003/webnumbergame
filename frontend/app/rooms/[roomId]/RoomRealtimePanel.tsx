@@ -24,8 +24,12 @@ const resolveWsBase = () => {
 };
 
 const LOCKED_ROUND_NUMBER = 1;
-const LOCKED_DURATION_MINUTES = 1;
-const LOCKED_PROBLEM_COUNT = 3;
+const DEFAULT_DURATION_MINUTES = 1;
+const DEFAULT_PROBLEM_COUNT = 3;
+const MIN_DURATION = 1;
+const MAX_DURATION = 30;
+const MIN_PROBLEM_COUNT = 1;
+const MAX_PROBLEM_COUNT = 10;
 
 export default function RoomRealtimePanel({ room, participants }: Props) {
   const roomId = room.id;
@@ -37,6 +41,8 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
   const [playerOne, setPlayerOne] = useState<string | undefined>(room.player_one_id ?? undefined);
   const [playerTwo, setPlayerTwo] = useState<string | undefined>(room.player_two_id ?? undefined);
   const [participantList, setParticipantList] = useState<Participant[]>(participants);
+  const [problemCount, setProblemCount] = useState<number>(DEFAULT_PROBLEM_COUNT);
+  const [durationMinutes, setDurationMinutes] = useState<number>(DEFAULT_DURATION_MINUTES);
 
   const { user } = useAuth();
   const router = useRouter();
@@ -143,13 +149,23 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
     setSubmitting(true);
     setError(null);
     setSuccess(null);
+    const normalizedDuration = Math.min(
+      MAX_DURATION,
+      Math.max(MIN_DURATION, durationMinutes || DEFAULT_DURATION_MINUTES),
+    );
+    const normalizedProblemCount = Math.min(
+      MAX_PROBLEM_COUNT,
+      Math.max(MIN_PROBLEM_COUNT, problemCount || DEFAULT_PROBLEM_COUNT),
+    );
     try {
       await api.post(`/rooms/${roomId}/rounds`, {
         round_number: LOCKED_ROUND_NUMBER,
-        duration_minutes: LOCKED_DURATION_MINUTES,
-        problem_count: LOCKED_PROBLEM_COUNT,
+        duration_minutes: normalizedDuration,
+        problem_count: normalizedProblemCount,
       });
-      setSuccess("1라운드(3문제 · 문제당 1분) 매치가 시작되었습니다.");
+      setSuccess(`1라운드(${normalizedProblemCount}문제 · 문제당 ${normalizedDuration}분) 매치가 시작되었습니다.`);
+      setDurationMinutes(normalizedDuration);
+      setProblemCount(normalizedProblemCount);
     } catch (err: any) {
       const detail = err?.response?.data?.detail ?? "라운드 시작에 실패했습니다.";
       setError(detail);
@@ -194,18 +210,49 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
           onSubmit={handleStartRound}
           className="rounded-3xl border border-night-800/70 bg-night-950/45 p-5 text-night-200"
         >
-          <div className="mt-4 rounded-2xl border border-night-900/60 bg-night-900/20 p-4 text-sm text-night-300">
-            <p className="text-base font-semibold text-white">고정된 라운드 설정</p>
-            <p className="mt-1 text-xs text-night-500">
-              현재는 라운드/시간/문제 수를 변경할 수 없으며 아래 설정으로만 진행됩니다.
-            </p>
-            <ul className="mt-3 space-y-1 text-night-200">
-              <li>· 라운드 수: {LOCKED_ROUND_NUMBER}회</li>
-              <li>· 문제 수: {LOCKED_PROBLEM_COUNT}문제</li>
-              <li>· 문제당 제한 시간: {LOCKED_DURATION_MINUTES}분</li>
-              <li>· 모든 플레이어는 다음 문제 안내 후 확인 버튼을 눌러야 합니다.</li>
-            </ul>
+          <div className="mt-4 grid gap-3 text-night-300 sm:grid-cols-3">
+            <label className="space-y-1 text-night-400">
+              <span>라운드 수 (고정)</span>
+              <input
+                type="number"
+                value={LOCKED_ROUND_NUMBER}
+                disabled
+                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white opacity-70"
+              />
+              <span className="text-[11px] text-night-500">현재는 1회만 지원합니다.</span>
+            </label>
+            <label className="space-y-1 text-night-400">
+              <span>문제당 제한 시간 (분)</span>
+              <input
+                type="number"
+                min={MIN_DURATION}
+                max={MAX_DURATION}
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(Number(e.target.value) || DEFAULT_DURATION_MINUTES)}
+                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+              />
+              <span className="text-[11px] text-night-500">
+                {MIN_DURATION}~{MAX_DURATION}분 사이를 입력하세요.
+              </span>
+            </label>
+            <label className="space-y-1 text-night-400">
+              <span>문제 수</span>
+              <input
+                type="number"
+                min={MIN_PROBLEM_COUNT}
+                max={MAX_PROBLEM_COUNT}
+                value={problemCount}
+                onChange={(e) => setProblemCount(Number(e.target.value) || DEFAULT_PROBLEM_COUNT)}
+                className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+              />
+              <span className="text-[11px] text-night-500">
+                {MIN_PROBLEM_COUNT}~{MAX_PROBLEM_COUNT}문제
+              </span>
+            </label>
           </div>
+          <p className="mt-3 text-xs text-night-500">
+            모든 문제 사이에는 1초 간 인터미션이 있으며, 각 문제 종료 후 플레이어 확인 창을 통해 다음 문제로 넘어갑니다.
+          </p>
           {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
           {success && <p className="mt-1 text-sm text-emerald-300">{success}</p>}
           <button
