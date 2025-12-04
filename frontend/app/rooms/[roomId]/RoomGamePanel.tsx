@@ -402,8 +402,16 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   }, []);
 
   const fetcher = async (url: string) => {
-    const { data } = await api.get<ActiveMatch | null>(url);
-    return data;
+    try {
+      const { data } = await api.get<ActiveMatch | null>(url);
+      return data;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status && [403, 404, 409, 410].includes(status)) {
+        return null;
+      }
+      throw err;
+    }
   };
 
   const { data, mutate } = useSWR(user ? `/rooms/${roomId}/active-match` : null, fetcher, {
