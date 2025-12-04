@@ -25,6 +25,8 @@ from ..schemas.room import (
     InputUpdateRequest,
     ChatMessageRequest,
     ChatMessageResponse,
+    RelayRosterUpdate,
+    RelayRosterResponse,
 )
 from ..services.game_service import GameService
 from ..services.room_service import RoomService
@@ -37,6 +39,18 @@ def _participant_to_public(participant: RoomParticipant, username: str) -> Parti
     payload = participant.model_dump()
     payload["username"] = username
     return ParticipantPublic.model_validate(payload)
+
+
+def _relay_event_payload(room: Room, roster: dict | None) -> dict | None:
+    if not roster:
+        return None
+    return {
+        "type": "relay_roster",
+        "room_id": room.id,
+        "team_size": room.team_size,
+        "team_a": roster.get("team_a", []),
+        "team_b": roster.get("team_b", []),
+    }
 
 
 @router.delete("/{room_id}/participants/me", status_code=status.HTTP_204_NO_CONTENT)
@@ -71,6 +85,9 @@ async def leave_room(
     if remaining_player_id:
         forfeited = await _handle_player_forfeit(session, room, winner_user_id=remaining_player_id)
 
+    relay_payload: dict | None = None
+    relay_changed = False
+
     if room.host_id == current_user.id:
         await session.execute(delete(RoomParticipant).where(RoomParticipant.room_id == room.id))
         await session.delete(room)
@@ -81,6 +98,10 @@ async def leave_room(
             {"type": "room_closed", "room_id": room.id, "reason": reason},
         )
         return
+
+    if room.team_size > 1:
+        service = RoomService(session)
+        relay_payload, relay_changed = await service.normalize_relay_roster(room)
 
     session.add(room)
     await session.commit()
@@ -103,6 +124,10 @@ async def leave_room(
                 "player_two_id": room.player_two_id,
             },
         )
+    if relay_changed:
+        event = _relay_event_payload(room, relay_payload)
+        if event:
+            await manager.broadcast_room(room.id, event)
 
 
 async def _get_room_or_404(session: AsyncSession, room_id: str) -> Room:
@@ -312,6 +337,40 @@ async def assign_player(
         },
     )
     return RoomPublic.model_validate(room)
+
+
+@router.post("/{room_id}/relay-roster", response_model=RelayRosterResponse)
+async def update_relay_roster(
+    room_id: str,
+    payload: RelayRosterUpdate,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    room = await _get_room_or_404(session, room_id)
+    if room.host_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="방장만 팀을 구성할 수 있습니다.")
+    if room.team_size <= 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="릴레이 슬롯이 없는 방입니다.")
+
+    service = RoomService(session)
+    sanitize = lambda values: [(value or None) for value in values]
+    try:
+        roster = await service.update_relay_roster(
+            room=room,
+            team_a=sanitize(payload.team_a),
+            team_b=sanitize(payload.team_b),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    response_payload = {
+        "room_id": room.id,
+        "team_size": room.team_size,
+        "team_a": roster.get("team_a", []),
+        "team_b": roster.get("team_b", []),
+    }
+    await manager.broadcast_room(room.id, {"type": "relay_roster", **response_payload})
+    return RelayRosterResponse(**response_payload)
 
 
 @router.post("/{room_id}/inputs", status_code=status.HTTP_204_NO_CONTENT)

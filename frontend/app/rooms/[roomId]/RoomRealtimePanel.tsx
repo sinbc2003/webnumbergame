@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
 import { describeRoomMode } from "@/lib/roomLabels";
+import { RELAY_TEAM_A, RELAY_TEAM_B } from "@/lib/relay";
 import type { Participant, Room } from "@/types/api";
 
 interface Props {
@@ -97,6 +98,40 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
         } else if (data.type === "participant_left") {
           setParticipantList((prev) => prev.filter((p) => p.user_id !== data.user_id));
           refreshParticipants();
+        } else if (data.type === "relay_roster") {
+          const slotMap = new Map<string, { team_label: string; order_index: number }>();
+          const applySlots = (
+            slots: Array<{ slot_index?: number; user_id?: string | null }>,
+            teamLabel: typeof RELAY_TEAM_A | typeof RELAY_TEAM_B,
+          ) => {
+            slots?.forEach((slot) => {
+              if (!slot) return;
+              const slotIndex = typeof slot.slot_index === "number" ? slot.slot_index : null;
+              const userId = slot.user_id ?? undefined;
+              if (!userId || slotIndex === null) return;
+              slotMap.set(userId, { team_label: teamLabel, order_index: slotIndex });
+            });
+          };
+          applySlots(data.team_a ?? [], RELAY_TEAM_A);
+          applySlots(data.team_b ?? [], RELAY_TEAM_B);
+          setParticipantList((prev) =>
+            prev.map((participant) => {
+              const info = slotMap.get(participant.user_id);
+              if (!info) {
+                if (!participant.team_label && participant.order_index == null) {
+                  return participant;
+                }
+                return { ...participant, team_label: null, order_index: null };
+              }
+              if (
+                participant.team_label === info.team_label &&
+                participant.order_index === info.order_index
+              ) {
+                return participant;
+              }
+              return { ...participant, team_label: info.team_label, order_index: info.order_index };
+            }),
+          );
         } else if (data.type === "room_closed") {
           setError("방장이 방을 종료했습니다.");
           setTimeout(() => router.push("/rooms"), 1000);
@@ -137,12 +172,18 @@ export default function RoomRealtimePanel({ room, participants }: Props) {
 
   const participantItems = participantList.map((participant) => {
     const baseLabel = participant.user_id === hostId ? "방장" : participant.role === "player" ? "플레이어" : "관전자";
+    const relayLabel =
+      participant.team_label === RELAY_TEAM_A && typeof participant.order_index === "number"
+        ? `릴레이 A 팀 · ${participant.order_index + 1}번`
+        : participant.team_label === RELAY_TEAM_B && typeof participant.order_index === "number"
+          ? `릴레이 B 팀 · ${participant.order_index + 1}번`
+          : null;
     const slotLabel =
       participant.user_id === playerOne
         ? "플레이어 1"
         : participant.user_id === playerTwo
           ? "플레이어 2"
-          : null;
+          : relayLabel;
     return {
       ...participant,
       label: displayName(participant),

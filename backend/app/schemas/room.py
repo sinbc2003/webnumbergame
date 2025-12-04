@@ -80,6 +80,24 @@ class PlayerAssignmentRequest(BaseModel):
     user_id: str | None = None
 
 
+class RelayRosterUpdate(BaseModel):
+    team_a: List[str | None]
+    team_b: List[str | None]
+
+
+class RelaySlotPublic(BaseModel):
+    slot_index: int
+    user_id: str | None
+    username: str | None
+
+
+class RelayRosterResponse(BaseModel):
+    room_id: str
+    team_size: int
+    team_a: List[RelaySlotPublic]
+    team_b: List[RelaySlotPublic]
+
+
 class SubmissionRequest(BaseModel):
     expression: str
     mode: RoundType

@@ -9,10 +9,16 @@ import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
 import { describeRoomMode, describeMatchup } from "@/lib/roomLabels";
+import { RELAY_TEAM_A, RELAY_TEAM_B } from "@/lib/relay";
 import type { ActiveMatch, Participant, RoundType, Room } from "@/types/api";
 
 type BoardSlot = "playerOne" | "playerTwo";
 type PlayerAssignmentSlot = "player_one" | "player_two";
+type RelaySelections = {
+  teamA: string[];
+  teamB: string[];
+};
+type RelayTeamKey = keyof RelaySelections;
 
 type RoomEventPayload = {
   type?: string;
@@ -53,6 +59,17 @@ type RoomEventPayload = {
   username?: string;
   message?: string;
   timestamp?: string;
+  team_a?: Array<{
+    slot_index?: number;
+    user_id?: string | null;
+    username?: string | null;
+  }>;
+  team_b?: Array<{
+    slot_index?: number;
+    user_id?: string | null;
+    username?: string | null;
+  }>;
+  team_size?: number;
 };
 
 interface HistoryEntry {
@@ -155,6 +172,37 @@ const TEAM_MEMBER_LABEL_MAP: Record<number, string[]> = {
 };
 const TEAM_TOTAL_BUDGET = 32;
 
+const createEmptyRelaySelections = (teamSize: number): RelaySelections => {
+  const normalized = Math.max(0, teamSize);
+  return {
+    teamA: Array.from({ length: normalized }, () => ""),
+    teamB: Array.from({ length: normalized }, () => ""),
+  };
+};
+
+const deriveRelaySelections = (participants: Participant[], teamSize: number): RelaySelections => {
+  const base = createEmptyRelaySelections(teamSize);
+  if (!teamSize) {
+    return base;
+  }
+  participants.forEach((participant) => {
+    if (!participant.user_id) return;
+    const order = typeof participant.order_index === "number" ? participant.order_index : null;
+    if (order === null || order < 0 || order >= teamSize) return;
+    if (participant.team_label === RELAY_TEAM_A) {
+      base.teamA[order] = participant.user_id;
+    } else if (participant.team_label === RELAY_TEAM_B) {
+      base.teamB[order] = participant.user_id;
+    }
+  });
+  return base;
+};
+
+const relaySelectionsToPayload = (state: RelaySelections) => ({
+  team_a: state.teamA.map((value) => value || null),
+  team_b: state.teamB.map((value) => value || null),
+});
+
 const buildMemberNames = (teamSize: number) => {
   if (TEAM_MEMBER_LABEL_MAP[teamSize]) {
     return TEAM_MEMBER_LABEL_MAP[teamSize]!;
@@ -212,6 +260,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const router = useRouter();
   const isTeamRound = roundType === "round2_team";
   const teamSize = Math.max(1, room.team_size ?? (isTeamRound ? 4 : 1));
+  const isRelayRoom = teamSize > 1;
+  const relaySlotCount = isRelayRoom ? teamSize : 0;
   const [playerOne, setPlayerOne] = useState<string | undefined>(initialPlayerOne);
   const [playerTwo, setPlayerTwo] = useState<string | undefined>(initialPlayerTwo);
   const [boards, setBoards] = useState<{ playerOne: BoardState; playerTwo: BoardState }>({
@@ -236,6 +286,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const [preCountdown, setPreCountdown] = useState<number | null>(null);
   const [leaving, setLeaving] = useState(false);
   const [assigningSlot, setAssigningSlot] = useState<PlayerAssignmentSlot | null>(null);
+  const [relaySelections, setRelaySelections] = useState<RelaySelections>(() =>
+    deriveRelaySelections(participants, relaySlotCount),
+  );
+  const [relaySaving, setRelaySaving] = useState(false);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const userInteractedRef = useRef(false);
@@ -292,6 +346,14 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   useEffect(() => {
     setParticipantState(participants);
   }, [participants]);
+
+  useEffect(() => {
+    if (!isRelayRoom) {
+      setRelaySelections(createEmptyRelaySelections(0));
+      return;
+    }
+    setRelaySelections(deriveRelaySelections(participantState, relaySlotCount));
+  }, [isRelayRoom, participantState, relaySlotCount]);
 
   useEffect(() => {
     boardsRef.current = boards;
@@ -494,6 +556,73 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerOne: teamSize > 1 ? "릴레이 A 팀" : "플레이어 1",
     playerTwo: teamSize > 1 ? "릴레이 B 팀" : "플레이어 2",
   };
+  const renderRelayTeamColumn = (teamKey: RelayTeamKey) => {
+    if (!isRelayRoom) return null;
+    const selections = relaySelections[teamKey];
+    const columnLabel = teamKey === "teamA" ? slotLabels.playerOne : slotLabels.playerTwo;
+    const assignedCount = selections.filter((value) => Boolean(value)).length;
+    return (
+      <div className="rounded-2xl border border-night-900/60 bg-night-950/40 p-4 text-sm text-night-200">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">{columnLabel}</p>
+            <p className="text-xs text-night-500">
+              {assignedCount} / {relaySlotCount}명 배정
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 space-y-3">
+          {selections.map((userId, index) => {
+            const participant = userId ? participantMap.get(userId) ?? null : null;
+            const options = buildRelayOptions(userId);
+            const slotTitle = `${index + 1}번 슬롯`;
+            const displayName = userId ? participantLabel(userId) : "비어 있음";
+            return (
+              <div
+                key={`${teamKey}-${index}`}
+                className="rounded-xl border border-night-900/40 bg-night-900/30 p-3 text-sm text-night-200"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">{slotTitle}</p>
+                    <p className="text-base font-semibold text-white">{displayName}</p>
+                    {participant?.team_label && typeof participant.order_index === "number" && (
+                      <p className="text-[11px] text-night-500">
+                        {participant.team_label === RELAY_TEAM_A ? "A" : "B"}팀 · {participant.order_index + 1}번 주자
+                      </p>
+                    )}
+                  </div>
+                  {participant?.is_ready && (
+                    <span className="rounded-full border border-emerald-400 px-2 py-0.5 text-[10px] text-emerald-200">READY</span>
+                  )}
+                </div>
+                {isHost ? (
+                  <select
+                    value={userId}
+                    disabled={relaySaving}
+                    onChange={(event) => handleRelaySlotChange(teamKey, index, event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+                  >
+                    {options.map((option) => (
+                      <option
+                        key={`${teamKey}-${index}-${option.value || "empty"}`}
+                        value={option.value}
+                        disabled={option.disabled}
+                      >
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="mt-2 text-[11px] text-night-500">방장이 배정합니다.</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
   const participantQueue = useMemo(() => {
     return participantState
       .map((participant, index) => ({ participant, index }))
@@ -507,6 +636,48 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   }, [participantState]);
 
   const canSendChat = Boolean(user);
+
+  const refreshParticipantsList = useCallback(async () => {
+    try {
+      const { data } = await api.get<Participant[]>(`/rooms/${roomId}/participants`);
+      setParticipantState(data);
+    } catch {
+      // ignore
+    }
+  }, [roomId]);
+
+  const participantMap = useMemo(() => {
+    const map = new Map<string, Participant>();
+    participantState.forEach((participant) => {
+      if (participant.user_id) {
+        map.set(participant.user_id, participant);
+      }
+    });
+    return map;
+  }, [participantState]);
+
+  const assignedRelayUserIds = useMemo(() => {
+    const values = [...relaySelections.teamA, ...relaySelections.teamB].filter(Boolean) as string[];
+    return new Set(values);
+  }, [relaySelections]);
+
+  const buildRelayOptions = useCallback(
+    (currentValue: string) => {
+      const normalizedCurrent = currentValue || "";
+      return [{ label: "비워두기", value: "", disabled: false }].concat(
+        participantQueue.map((participant) => {
+          const disabled =
+            assignedRelayUserIds.has(participant.user_id) && participant.user_id !== normalizedCurrent;
+          return {
+            label: participant.username ?? (participant.user_id ? `참가자 ${participant.user_id.slice(0, 6)}…` : "이름 없음"),
+            value: participant.user_id,
+            disabled,
+          };
+        }),
+      );
+    },
+    [participantQueue, assignedRelayUserIds],
+  );
 
   const refreshRoomSnapshot = useCallback(async () => {
     try {
@@ -655,6 +826,41 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       }
     },
     [isHost, mutate, playerOne, playerTwo, roomId],
+  );
+
+  const handleRelaySlotChange = useCallback(
+    async (teamKey: RelayTeamKey, slotIndex: number, rawValue: string) => {
+      if (!isHost || !isRelayRoom || relaySaving) return;
+      const nextValue = rawValue || "";
+      if (relaySelections[teamKey][slotIndex] === nextValue) return;
+      setStatusError(null);
+      setStatusMessage(null);
+      const nextSelections: RelaySelections = {
+        teamA: [...relaySelections.teamA],
+        teamB: [...relaySelections.teamB],
+      };
+      if (nextValue) {
+        nextSelections.teamA = nextSelections.teamA.map((value, idx) =>
+          value === nextValue && !(teamKey === "teamA" && idx === slotIndex) ? "" : value,
+        );
+        nextSelections.teamB = nextSelections.teamB.map((value, idx) =>
+          value === nextValue && !(teamKey === "teamB" && idx === slotIndex) ? "" : value,
+        );
+      }
+      nextSelections[teamKey][slotIndex] = nextValue;
+      setRelaySelections(nextSelections);
+      setRelaySaving(true);
+      try {
+        await api.post(`/rooms/${roomId}/relay-roster`, relaySelectionsToPayload(nextSelections));
+        setStatusMessage("릴레이 슬롯을 업데이트했습니다.");
+      } catch (err: any) {
+        setStatusError(err?.response?.data?.detail ?? "릴레이 슬롯을 업데이트하지 못했습니다.");
+        await refreshParticipantsList();
+      } finally {
+        setRelaySaving(false);
+      }
+    },
+    [isHost, isRelayRoom, relaySaving, relaySelections, refreshParticipantsList, roomId],
   );
 
   useEffect(() => {
@@ -922,6 +1128,46 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               ];
               return next.slice(-50);
             });
+            break;
+          }
+          case "relay_roster": {
+            const slotMap = new Map<string, { team_label: string; order_index: number }>();
+            const applySlots = (
+              slots: RoomEventPayload["team_a"],
+              teamLabel: typeof RELAY_TEAM_A | typeof RELAY_TEAM_B,
+            ) => {
+              slots?.forEach((slot) => {
+                if (!slot) return;
+                const slotIndex = typeof slot.slot_index === "number" ? slot.slot_index : null;
+                const userId = slot.user_id ?? undefined;
+                if (!userId || slotIndex === null) return;
+                slotMap.set(userId, { team_label: teamLabel, order_index: slotIndex });
+              });
+            };
+            applySlots(payload.team_a ?? [], RELAY_TEAM_A);
+            applySlots(payload.team_b ?? [], RELAY_TEAM_B);
+            setParticipantState((prev) =>
+              prev.map((participant) => {
+                const info = slotMap.get(participant.user_id);
+                if (!info) {
+                  if (!participant.team_label && participant.order_index == null) {
+                    return participant;
+                  }
+                  return { ...participant, team_label: null, order_index: null };
+                }
+                if (
+                  participant.team_label === info.team_label &&
+                  participant.order_index === info.order_index
+                ) {
+                  return participant;
+                }
+                return {
+                  ...participant,
+                  team_label: info.team_label,
+                  order_index: info.order_index,
+                };
+              }),
+            );
             break;
           }
           default:
@@ -1327,6 +1573,22 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               {slotCardNodes[1]}
             </div>
           </div>
+
+          {isRelayRoom && (
+            <div className="w-full rounded-2xl border border-night-800/70 bg-night-950/30 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.4em] text-night-500">릴레이 로스터</p>
+                  <p className="text-2xl font-semibold text-white">{matchupLabel} 팀 구성</p>
+                </div>
+                {relaySaving && <span className="text-xs text-night-500">업데이트 중...</span>}
+              </div>
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                {renderRelayTeamColumn("teamA")}
+                {renderRelayTeamColumn("teamB")}
+              </div>
+            </div>
+          )}
 
           <div className="flex w-full flex-1 flex-col rounded-2xl border border-night-800/70 bg-night-900/40 p-4 text-night-200 lg:max-h-[66vh] lg:overflow-hidden">
             <div className="flex items-center justify-between">
