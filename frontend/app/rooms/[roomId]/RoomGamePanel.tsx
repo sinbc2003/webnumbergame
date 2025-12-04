@@ -1119,15 +1119,22 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 typeof payload.submission.cost === "number"
                   ? payload.submission.cost
                   : countOperators(payload.submission.expression);
-              setLatestCostBySlot((prev) => ({
-                ...prev,
-                [slot]: submissionCost,
-              }));
+              const metTarget =
+                payload.submission!.distance === 0 ||
+                (typeof payload.submission!.result_value === "number" && currentTarget === payload.submission!.result_value);
+              if (metTarget) {
+                setLatestCostBySlot((prev) => {
+                  const existing = prev[slot];
+                  if (existing !== null && existing <= submissionCost) {
+                    return prev;
+                  }
+                  return {
+                    ...prev,
+                    [slot]: submissionCost,
+                  };
+                });
+              }
               setBoards((prev) => {
-                const metTarget =
-                  payload.submission!.distance === 0 ||
-                  (typeof payload.submission!.result_value === "number" &&
-                    currentTarget === payload.submission!.result_value);
                 const entry: HistoryEntry = {
                   expression: payload.submission!.expression,
                   operatorCount: submissionCost,
