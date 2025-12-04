@@ -2500,33 +2500,42 @@ function PlayerPanel({
         <div className="w-full lg:w-80">
           <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-4">
             <p className="text-sm font-semibold text-white">최근 히스토리</p>
-            <div className="mt-3 max-h-[420px] space-y-3 overflow-y-auto pr-2">
-              {history.length === 0 && <p className="text-sm text-night-500">아직 제출 기록이 없습니다.</p>}
-              {history.map((entry, index) => (
-                <div
-                  key={`${entry.timestamp}-${index}`}
-                  className="rounded-2xl border border-night-800/70 bg-night-900/40 p-3 text-sm text-night-200"
-                >
-                  <p className="break-all font-semibold text-white">{entry.expression}</p>
-                  <p className="text-xs text-night-400">연산기호 {entry.operatorCount}개</p>
+            <div className="mt-3 space-y-3">
+              <div className="flex h-[360px] flex-col overflow-hidden rounded-2xl border border-night-800/40 bg-night-900/20">
+                {history.length === 0 ? (
+                  <div className="flex h-full items-center justify-center px-4 text-sm text-night-500">
+                    아직 제출 기록이 없습니다.
+                  </div>
+                ) : (
+                  <div className="flex-1 space-y-3 overflow-y-auto p-3 pr-2">
+                    {history.map((entry, index) => (
+                      <div
+                        key={`${entry.timestamp}-${index}`}
+                        className="rounded-2xl border border-night-800/70 bg-night-900/60 p-3 text-sm text-night-200"
+                      >
+                        <p className="break-all font-semibold text-white">{entry.expression}</p>
+                        <p className="text-xs text-night-400">연산기호 {entry.operatorCount}개</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {bestEntry && (
+                <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+                  <p className="font-semibold">🏆 최고 기록</p>
+                  <p className="mt-1 break-all font-mono text-lg text-white">{bestEntry.expression}</p>
+                  <p className="text-xs text-amber-200/70">연산기호 {bestEntry.operatorCount}개</p>
                 </div>
-              ))}
+              )}
+              {isMine && typeof opponentOperatorCount === "number" && (
+                <div className="rounded-2xl border border-indigo-500/40 bg-indigo-500/10 p-4 text-xs text-indigo-100">
+                  <p className="font-semibold text-white">상대 최근 연산기호</p>
+                  <p className="mt-1 text-2xl font-black text-white">{opponentOperatorCount}개</p>
+                  <p className="text-[11px] text-indigo-200/70">이 수보다 줄이면 앞서갑니다!</p>
+                </div>
+              )}
             </div>
           </div>
-          {bestEntry && (
-            <div className="mt-3 rounded-3xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100">
-              <p className="font-semibold">🏆 최고 기록</p>
-              <p className="mt-1 break-all font-mono text-lg text-white">{bestEntry.expression}</p>
-              <p className="text-xs text-amber-200/70">연산기호 {bestEntry.operatorCount}개</p>
-            </div>
-          )}
-          {isMine && typeof opponentOperatorCount === "number" && (
-            <div className="mt-3 rounded-3xl border border-indigo-500/40 bg-indigo-500/10 p-4 text-xs text-indigo-100">
-              <p className="font-semibold text-white">상대 최근 연산기호</p>
-              <p className="mt-1 text-2xl font-black text-white">{opponentOperatorCount}개</p>
-              <p className="text-[11px] text-indigo-200/70">이 수보다 줄이면 앞서갑니다!</p>
-            </div>
-          )}
         </div>
       </div>
     );
