@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import RoomGamePanel from "./RoomGamePanel";
 import RoomRealtimePanel from "./RoomRealtimePanel";
+import { useAuth } from "@/hooks/useAuth";
 import type { Participant, Room } from "@/types/api";
 
 interface Props {
@@ -13,6 +14,18 @@ interface Props {
 
 export default function RoomPageShell({ room, participants }: Props) {
   const [focusMode, setFocusMode] = useState(false);
+  const { user } = useAuth();
+
+  const viewerParticipant = useMemo(() => {
+    if (!user?.id) return null;
+    return participants.find((participant) => participant.user_id === user.id) ?? null;
+  }, [participants, user?.id]);
+
+  const isHost = user?.id === room.host_id;
+  const isActivePlayer = viewerParticipant?.role === "player";
+  // Hosts and assigned players keep the sidebar; pure spectators get a full-width layout.
+  const showSidebar = !focusMode && (isHost || isActivePlayer);
+  const layoutClass = focusMode ? "" : showSidebar ? "grid gap-6 lg:grid-cols-[2.2fr,1fr]" : "";
 
   const handleFocusChange = useCallback((next: boolean) => {
     setFocusMode(next);
@@ -34,11 +47,11 @@ export default function RoomPageShell({ room, participants }: Props) {
   }, [focusMode]);
 
   return (
-    <div className={focusMode ? "" : "grid gap-6 lg:grid-cols-[2.2fr,1fr]"}>
+    <div className={layoutClass}>
       <section>
         <RoomGamePanel room={room} participants={participants} onPlayerFocusChange={handleFocusChange} />
       </section>
-      {!focusMode && (
+      {showSidebar && (
         <section>
           <RoomRealtimePanel room={room} participants={participants} />
         </section>
