@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -484,6 +484,7 @@ async def start_round(
         "current_index": 0,
         "player_one_id": room.player_one_id,
         "player_two_id": room.player_two_id,
+        "problem_duration_minutes": duration,
     }
 
     game_service = GameService(session)
@@ -528,6 +529,31 @@ def _serialize_submission(submission: Submission) -> dict:
     }
 
 
+def _problem_finished_payload(
+    room_id: str,
+    match_id: str,
+    submission: Submission | None,
+    reason: str,
+    *,
+    problem_index: int,
+    total_problems: int,
+    winner_user_id: str | None = None,
+) -> dict:
+    payload = {
+        "type": "problem_finished",
+        "room_id": room_id,
+        "match_id": match_id,
+        "reason": reason,
+        "problem_index": problem_index,
+        "total_problems": total_problems,
+        "winner_submission_id": submission.id if submission else None,
+        "winner_user_id": winner_user_id,
+    }
+    if submission:
+        payload["winner_submission"] = _serialize_submission(submission)
+    return payload
+
+
 def _round_finished_payload(
     room_id: str,
     match_id: str,
@@ -535,6 +561,9 @@ def _round_finished_payload(
     reason: str,
     *,
     winner_user_id: str | None = None,
+    problem_index: int | None = None,
+    total_problems: int | None = None,
+    include_problem_state: bool = True,
 ) -> dict:
     payload = {
         "type": "round_finished",
@@ -542,12 +571,107 @@ def _round_finished_payload(
         "match_id": match_id,
         "reason": reason,
         "winner_submission_id": submission.id if submission else None,
+        "problem_index": problem_index,
+        "total_problems": total_problems,
+        "include_problem_state": include_problem_state,
     }
     if submission:
         payload["winner_submission"] = _serialize_submission(submission)
     final_winner = winner_user_id or (submission.user_id if submission else None)
     payload["winner_user_id"] = final_winner
     return payload
+
+
+async def _handle_problem_completion(
+    session: AsyncSession,
+    room: Room,
+    match: Match,
+    game_service: GameService,
+    *,
+    reason: str,
+    winner_submission: Submission | None,
+    winner_user_id: str | None = None,
+) -> None:
+    metadata = match.metadata_snapshot or {}
+    problems = metadata.get("problems") or [
+        {"target_number": match.target_number, "optimal_cost": match.optimal_cost}
+    ]
+    total_problems = len(problems)
+    current_index = metadata.get("current_index", 0)
+    resolved_winner_id = winner_user_id or (winner_submission.user_id if winner_submission else None)
+
+    await manager.broadcast_room(
+        room.id,
+        _problem_finished_payload(
+            room.id,
+            match.id,
+            winner_submission,
+            reason,
+            problem_index=current_index,
+            total_problems=total_problems,
+            winner_user_id=resolved_winner_id,
+        ),
+    )
+
+    is_last_problem = current_index >= total_problems - 1
+    if is_last_problem:
+        closed_match = await game_service.close_match(
+            match,
+            winner_submission.id if winner_submission else None,
+        )
+        await manager.broadcast_room(
+            room.id,
+            _round_finished_payload(
+                room.id,
+                closed_match.id,
+                winner_submission,
+                reason,
+                winner_user_id=resolved_winner_id,
+                problem_index=current_index,
+                total_problems=total_problems,
+                include_problem_state=False,
+            ),
+        )
+        await _finalize_room(
+            session,
+            room,
+            closed_match,
+            winner_submission,
+            reason,
+            winner_user_id=resolved_winner_id,
+        )
+        return
+
+    duration_minutes = metadata.get("problem_duration_minutes") or settings.default_round_minutes
+    next_index = current_index + 1
+    next_problem = problems[next_index] if next_index < total_problems else problems[-1]
+
+    metadata["current_index"] = next_index
+    match.target_number = next_problem["target_number"]
+    match.optimal_cost = next_problem["optimal_cost"]
+    match.deadline = datetime.utcnow() + timedelta(minutes=duration_minutes)
+    match.metadata_snapshot = metadata
+    match.started_at = datetime.utcnow()
+    match.winning_submission_id = None
+
+    await session.execute(delete(Submission).where(Submission.match_id == match.id))
+    session.add(match)
+    await session.commit()
+    await session.refresh(match)
+
+    await manager.broadcast_room(
+        room.id,
+        {
+            "type": "problem_advanced",
+            "room_id": room.id,
+            "match_id": match.id,
+            "problem_index": next_index,
+            "total_problems": total_problems,
+            "target_number": match.target_number,
+            "optimal_cost": match.optimal_cost,
+            "deadline": match.deadline.isoformat() if match.deadline else None,
+        },
+    )
 
 
 async def _maybe_finish_expired_match(
@@ -562,15 +686,14 @@ async def _maybe_finish_expired_match(
         return
 
     best_submission = await game_service.get_best_submission(match.id)
-    closed_match = await game_service.close_match(
+    await _handle_problem_completion(
+        session,
+        room,
         match,
-        best_submission.id if best_submission else None,
+        game_service,
+        reason="timeout",
+        winner_submission=best_submission,
     )
-    await manager.broadcast_room(
-        room.id,
-        _round_finished_payload(room.id, closed_match.id, best_submission, reason="timeout"),
-    )
-    await _finalize_room(session, room, closed_match, best_submission, reason="timeout")
 
 
 async def _finalize_room(
@@ -654,12 +777,14 @@ async def submit_expression(
     await manager.broadcast_room(room.id, event_payload)
 
     if submission.distance == 0 and submission.cost <= match.optimal_cost:
-        await game_service.close_match(match, submission.id)
-        await manager.broadcast_room(
-            room.id,
-            _round_finished_payload(room.id, match.id, submission, reason="optimal"),
+        await _handle_problem_completion(
+            session,
+            room,
+            match,
+            game_service,
+            reason="optimal",
+            winner_submission=submission,
         )
-        await _finalize_room(session, room, match, submission, reason="optimal")
         return event_payload
 
     await _maybe_finish_expired_match(session, game_service, room, match)

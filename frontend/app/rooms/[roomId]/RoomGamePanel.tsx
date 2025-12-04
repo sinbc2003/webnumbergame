@@ -70,6 +70,13 @@ type RoomEventPayload = {
     username?: string | null;
   }>;
   team_size?: number;
+  problem_index?: number;
+  total_problems?: number;
+  include_problem_state?: boolean;
+  match_id?: string;
+  target_number?: number;
+  optimal_cost?: number;
+  deadline?: string;
 };
 
 interface HistoryEntry {
@@ -274,6 +281,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerTwo: createBoardState(),
   });
   const boardsRef = useRef<{ playerOne: BoardState; playerTwo: BoardState }>(boards);
+  const lastProblemSnapshotRef = useRef<{ playerOne: HistoryEntry[]; playerTwo: HistoryEntry[] } | null>(null);
   const [pendingInput, setPendingInput] = useState<{ slot: BoardSlot; value: string } | null>(null);
   const [submittingSlot, setSubmittingSlot] = useState<BoardSlot | null>(null);
   const playerTextareaRefs = useRef<Record<BoardSlot, HTMLTextAreaElement | null>>({
@@ -869,6 +877,76 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     [isHost, isRelayRoom, relaySaving, relaySelections, refreshParticipantsList, roomId],
   );
 
+  const handleProblemOutcome = useCallback(
+    (payload: RoomEventPayload) => {
+      const snapshot = boardsRef.current;
+      lastProblemSnapshotRef.current = {
+        playerOne: snapshot.playerOne.history.map((entry) => ({ ...entry })),
+        playerTwo: snapshot.playerTwo.history.map((entry) => ({ ...entry })),
+      };
+
+      const reason = payload.reason ?? "optimal";
+      const winnerSubmission = payload.winner_submission ?? null;
+      const winnerId =
+        payload.winner_user_id ?? winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
+
+      setRoundOutcome({
+        reason,
+        winnerId,
+        distance: winnerSubmission?.distance ?? null,
+        score: winnerSubmission?.score ?? null,
+      });
+      setPreCountdown(null);
+      setInitialRemaining(null);
+      tickRef.current = null;
+      setBoards({
+        playerOne: createBoardState(),
+        playerTwo: createBoardState(),
+      });
+
+      if (winnerId) {
+        const winnerLabel = participantLabel(winnerId);
+        setLastWinnerLabel(winnerLabel);
+        const reasonLabel =
+          reason === "timeout" ? "시간 종료 판정" : reason === "forfeit" ? "기권승" : "정답 제출";
+        setLastWinReason(reasonLabel);
+        if (winnerId === playerIdsRef.current.playerOne) {
+          setScoreboard((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
+        } else if (winnerId === playerIdsRef.current.playerTwo) {
+          setScoreboard((prev) => ({ ...prev, playerTwo: prev.playerTwo + 1 }));
+        }
+        if (winnerId === user?.id) {
+          const message =
+            reason === "timeout"
+              ? "시간 종료! 근사 정답으로 승리했습니다."
+              : reason === "forfeit"
+                ? "상대가 나가 기권승으로 처리되었습니다."
+                : "정답으로 승리했습니다!";
+          setStatusMessage(message);
+          setStatusError(null);
+          playTone("success");
+        } else {
+          const message =
+            reason === "timeout"
+              ? `${winnerLabel} 님이 더 가까운 해답을 제출했습니다.`
+              : reason === "forfeit"
+                ? `${winnerLabel} 님이 남아 있어 승리했습니다.`
+                : `${winnerLabel} 님이 정답을 찾아 라운드가 종료되었습니다.`;
+          setStatusError(message);
+          setStatusMessage(null);
+          playTone("error");
+        }
+      } else if (reason === "timeout") {
+        setStatusMessage("시간 종료! 제출된 식이 없어 무승부입니다.");
+        setStatusError(null);
+      } else if (reason === "forfeit") {
+        setStatusMessage("상대가 나가 라운드가 종료되었습니다.");
+        setStatusError(null);
+      }
+    },
+    [participantLabel, playTone, user?.id],
+  );
+
   useEffect(() => {
     if (!user) return;
     const ws = new WebSocket(wsUrl);
@@ -986,12 +1064,19 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             setRoundOutcome(null);
             setInitialRemaining(null);
             tickRef.current = null;
+            lastProblemSnapshotRef.current = null;
             triggerPreCountdown();
             mutate();
             break;
           }
           case "problem_advanced": {
             setStatusMessage("다음 문제로 이동했습니다.");
+            lastProblemSnapshotRef.current = null;
+            mutate();
+            break;
+          }
+          case "problem_finished": {
+            handleProblemOutcome(payload);
             mutate();
             break;
           }
@@ -1000,64 +1085,44 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             const winnerSubmission = payload.winner_submission;
             const winnerId =
               payload.winner_user_id ?? winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
-            const boardSnapshot = boardsRef.current;
+
+            if (payload.include_problem_state !== false) {
+              handleProblemOutcome(payload);
+            } else if (!lastProblemSnapshotRef.current) {
+              const snapshot = boardsRef.current;
+              lastProblemSnapshotRef.current = {
+                playerOne: snapshot.playerOne.history.map((entry) => ({ ...entry })),
+                playerTwo: snapshot.playerTwo.history.map((entry) => ({ ...entry })),
+              };
+            }
+
+            const historySource =
+              lastProblemSnapshotRef.current ??
+              {
+                playerOne: boardsRef.current.playerOne.history,
+                playerTwo: boardsRef.current.playerTwo.history,
+              };
             const historySnapshot = {
-              playerOne: boardSnapshot.playerOne.history.map((entry) => ({ ...entry })),
-              playerTwo: boardSnapshot.playerTwo.history.map((entry) => ({ ...entry })),
+              playerOne: historySource.playerOne.map((entry) => ({ ...entry })),
+              playerTwo: historySource.playerTwo.map((entry) => ({ ...entry })),
             };
-            const activeSnapshot = activeMatchRef.current;
-            setRoundOutcome({
-              reason,
-              winnerId,
-              distance: winnerSubmission?.distance ?? null,
-              score: winnerSubmission?.score ?? null,
-            });
+            lastProblemSnapshotRef.current = null;
+
             setPreCountdown(null);
             setInitialRemaining(null);
             tickRef.current = null;
-            setBoards({
-              playerOne: createBoardState(),
-              playerTwo: createBoardState(),
-            });
-            if (winnerId) {
-              const winnerLabel = participantLabel(winnerId);
-              setLastWinnerLabel(winnerLabel);
-              const reasonLabel =
-                reason === "timeout" ? "시간 종료 판정" : reason === "forfeit" ? "기권승" : "정답 제출";
-              setLastWinReason(reasonLabel);
-              if (winnerId === playerIdsRef.current.playerOne) {
-                setScoreboard((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
-              } else if (winnerId === playerIdsRef.current.playerTwo) {
-                setScoreboard((prev) => ({ ...prev, playerTwo: prev.playerTwo + 1 }));
-              }
-              if (winnerId === user?.id) {
-                const message =
-                  reason === "timeout"
-                    ? "시간 종료! 근사 정답으로 승리했습니다."
-                    : reason === "forfeit"
-                      ? "상대가 나가 기권승으로 처리되었습니다."
-                      : "정답으로 승리했습니다!";
-                setStatusMessage(message);
-                setStatusError(null);
-                playTone("success");
-              } else {
-                const message =
-                  reason === "timeout"
-                    ? `${winnerLabel} 님이 더 가까운 해답을 제출했습니다.`
-                    : reason === "forfeit"
-                      ? `${winnerLabel} 님이 남아 있어 승리했습니다.`
-                      : `${winnerLabel} 님이 정답을 찾아 라운드가 종료되었습니다.`;
-                setStatusError(message);
-                playTone("error");
-              }
-            } else if (reason === "timeout") {
-              setStatusMessage("시간 종료! 제출된 식이 없어 무승부입니다.");
-              setStatusError(null);
-            } else if (reason === "forfeit") {
-              setStatusMessage("상대가 나가 라운드가 종료되었습니다.");
-              setStatusError(null);
-            }
+
+            const activeSnapshot = activeMatchRef.current;
             const winnerLabel = winnerId ? participantLabel(winnerId) : "무승부";
+
+            setRoundOutcome((prev) =>
+              prev ?? {
+                reason,
+                winnerId,
+                distance: winnerSubmission?.distance ?? null,
+                score: winnerSubmission?.score ?? null,
+              },
+            );
             setMatchSummary({
               finishedAt: new Date().toISOString(),
               reason,
@@ -1065,9 +1130,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               winnerLabel,
               winnerExpression: winnerSubmission?.expression ?? null,
               winnerScore: winnerSubmission?.score ?? null,
-              targetNumber: activeSnapshot?.target_number ?? null,
-              totalProblems: activeSnapshot?.total_problems ?? null,
-              optimalCost: activeSnapshot?.optimal_cost ?? null,
+              targetNumber: activeSnapshot?.target_number ?? payload.target_number ?? null,
+              totalProblems: payload.total_problems ?? activeSnapshot?.total_problems ?? null,
+              optimalCost: activeSnapshot?.optimal_cost ?? payload.optimal_cost ?? null,
               matchup: matchupLabel,
               histories: historySnapshot,
               players: {
