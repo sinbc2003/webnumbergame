@@ -6,7 +6,11 @@ from typing import List
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_CORS_ORIGINS = ["http://localhost:3000"]
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    # Cloud Run 프런트엔드 서비스(https://number-game-web-170807697050.asia-northeast3.run.app)
+    "https://number-game-web-170807697050.asia-northeast3.run.app",
+]
 
 
 def _parse_cors_origins(value: str | List[str] | None) -> List[str] | None:

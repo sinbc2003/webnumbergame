@@ -21,6 +21,7 @@ poetry run uvicorn app.main:app --reload
 DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DB
 SECRET_KEY=랜덤문자열
 NEXT_PUBLIC_API_BASE=http://localhost:8000/api
+CORS_ORIGINS=["http://localhost:3000","https://number-game-web-170807697050.asia-northeast3.run.app"]
 DB_INIT_MAX_RETRIES=5
 DB_INIT_RETRY_INTERVAL_SECONDS=2
 ``` 
