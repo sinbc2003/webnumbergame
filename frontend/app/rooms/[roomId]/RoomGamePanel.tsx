@@ -1538,17 +1538,17 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     return (
       <div className="min-h-screen bg-[#050a15] px-4 py-6 text-night-100">
         {preCountdown !== null && <CountdownOverlay value={preCountdown} />}
-        <div className="mx-auto flex max-w-5xl flex-col gap-4">
+        <div className="mx-auto flex max-w-5xl flex-col gap-3">
           <div className="rounded-3xl border border-night-800/60 bg-night-950/70 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.5)] sm:p-5">
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-3">
-                <div className="min-w-[170px]">
+                <div className="order-1 min-w-[170px]">
                   <p className="text-[11px] uppercase tracking-[0.45em] text-night-500">{roundLabel}</p>
                   <p className="mt-1 text-xs text-night-400">
                     {activeMatch.current_index + 1} / {activeMatch.total_problems} 문제 진행 중
                   </p>
                 </div>
-                <div className="order-3 w-full sm:order-2 sm:flex-1">
+                <div className="order-2 w-full sm:order-2 sm:flex-1">
                   <div className="flex justify-center">
                     <div
                       className={`w-full max-w-[240px] rounded-full border-2 px-8 py-3 text-center text-4xl font-black ${
@@ -1558,32 +1558,34 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                       {formattedRemaining}
                     </div>
                   </div>
-                  <div className="mt-3 text-center text-sm text-night-400">
-                    <p className="text-[11px] uppercase tracking-[0.35em] text-night-600">문제 스코어</p>
-                    <p className="text-2xl font-black text-white">
-                      {problemWins.playerOne} : {problemWins.playerTwo}
-                    </p>
-                  </div>
                 </div>
-                <div className="order-2 ml-auto shrink-0 sm:order-3">{renderLeaveButton()}</div>
+                <div className="order-3 w-full text-center text-sm text-night-400 sm:w-auto sm:text-right">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-night-700/70 px-4 py-1 text-white">
+                    현재 스코어{" "}
+                    <span className="text-base font-black text-white">
+                      {problemWins.playerOne}:{problemWins.playerTwo}
+                    </span>
+                  </span>
+                </div>
+                <div className="order-4 ml-auto shrink-0 sm:order-4">{renderLeaveButton()}</div>
               </div>
 
-              <div className="grid gap-3 text-night-200 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl border border-night-900/60 bg-night-900/30 p-3">
+              <div className="grid gap-2.5 text-night-200 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl border border-night-900/60 bg-night-900/30 p-2.5">
                   <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">목표값</p>
-                  <p className="mt-1 text-3xl font-black text-white">{activeMatch.target_number}</p>
+                  <p className="mt-0.5 text-3xl font-black text-white">{activeMatch.target_number}</p>
                 </div>
-                <div className="rounded-2xl border border-night-900/60 bg-night-900/30 p-3">
+                <div className="rounded-2xl border border-night-900/60 bg-night-900/30 p-2.5">
                   <p className="text-[11px] uppercase tracking-[0.3em] text-night-500">최적 연산기호수</p>
-                  <p className="mt-1 text-3xl font-black text-white">{activeMatch.optimal_cost}</p>
+                  <p className="mt-0.5 text-3xl font-black text-white">{activeMatch.optimal_cost}</p>
                 </div>
-                <div className="rounded-2xl border border-night-900/60 bg-night-900/30 p-3">
+                <div className="rounded-2xl border border-night-900/60 bg-night-900/30 p-2.5">
                   <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">값</p>
-                  <p className="mt-1 text-2xl font-bold text-white">{expressionValueDisplay}</p>
+                  <p className="mt-0.5 text-2xl font-bold text-white">{expressionValueDisplay}</p>
                 </div>
-                <div className="rounded-2xl border border-night-900/60 bg-night-900/30 p-3">
+                <div className="rounded-2xl border border-night-900/60 bg-night-900/30 p-2.5">
                   <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">연산기호</p>
-                  <p className="mt-1 text-2xl font-bold text-white">{operatorCountDisplay}</p>
+                  <p className="mt-0.5 text-2xl font-bold text-white">{operatorCountDisplay}</p>
                 </div>
               </div>
             </div>
