@@ -17,7 +17,7 @@ export default function AdminPage() {
             <AdminPanel />
           </div>
         </main>
-      </TopNav>
+      </TopNav> 
     </RequireAuth>
   );
 }
