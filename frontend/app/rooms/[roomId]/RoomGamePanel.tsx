@@ -1153,10 +1153,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   isOptimal: Boolean(payload.submission!.is_optimal),
                   metTarget,
                 };
-                const shouldRecord = allowHistory(entry);
-                const nextHistory: HistoryEntry[] = shouldRecord
-                  ? [entry, ...prev[slot].history].slice(0, 10)
-                  : prev[slot].history;
+                const nextHistory: HistoryEntry[] = [entry, ...prev[slot].history].slice(0, 10);
                 return {
                   ...prev,
                   [slot]: { ...prev[slot], history: nextHistory },
@@ -1606,10 +1603,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const myBoard = mySlot ? boards[mySlot] : null;
   const myExpression = myBoard?.expression ?? "";
   const myHistory = myBoard?.history ?? [];
-  const allowHistory = (entry: HistoryEntry | null) => {
-    if (!entry) return false;
-    return Boolean(entry.metTarget || entry.isOptimal);
-  };
   const expressionValue = useMemo(() => computeExpressionValue(myExpression), [myExpression]);
   const operatorCount = useMemo(() => countOperators(myExpression), [myExpression]);
   const expressionValueDisplay = myExpression.trim() ? expressionValue ?? "-" : "-";
