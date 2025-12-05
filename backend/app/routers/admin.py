@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import datetime
 from typing import Sequence
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -17,6 +18,7 @@ from ..models import (
     RoomParticipant,
     RoundSnapshot,
     Submission,
+    SpecialGameConfig,
     Team,
     TeamMember,
     Tournament,
@@ -25,6 +27,7 @@ from ..models import (
     User,
 )
 from ..schemas.problem import ProblemCreate, ProblemPublic, ProblemUpdate, ResetSummary
+from ..schemas.special_game import SpecialGameConfigPayload, SpecialGameConfigState
 from ..schemas.admin import UserResetRequest, UserResetResponse
 from ..schemas.user import UserPublic
 from ..services.room_cleanup import delete_empty_rooms as service_delete_empty_rooms
@@ -43,6 +46,26 @@ async def _get_problem_or_404(problem_id: str, session: AsyncSession) -> Problem
     if not problem:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="문제를 찾을 수 없습니다.")
     return problem
+
+
+async def _get_or_create_special_config(session: AsyncSession) -> SpecialGameConfig:
+    statement = select(SpecialGameConfig).where(SpecialGameConfig.id == 1)
+    result = await session.execute(statement)
+    config = result.scalar_one_or_none()
+    if config:
+        return config
+    config = SpecialGameConfig(id=1)
+    session.add(config)
+    await session.commit()
+    await session.refresh(config)
+    return config
+
+
+def _sanitize_optional(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
 
 
 @router.get("/problems", response_model=list[ProblemPublic])
@@ -65,6 +88,59 @@ async def create_problem(payload: ProblemCreate, session: AsyncSession = Depends
     await session.commit()
     await session.refresh(problem)
     return ProblemPublic.model_validate(problem)
+
+
+@router.get("/special-game/config", response_model=SpecialGameConfigState | None)
+async def read_special_game_config(session: AsyncSession = Depends(get_session)) -> SpecialGameConfigState | None:
+    config = await _get_or_create_special_config(session)
+    if not config.problem_id:
+        return None
+    problem = await session.get(Problem, config.problem_id)
+    if not problem:
+        return SpecialGameConfigState(
+            problem_id=config.problem_id,
+            title=config.title,
+            description=config.description,
+            target_number=None,
+            optimal_cost=None,
+            updated_at=config.updated_at,
+        )
+    return SpecialGameConfigState(
+        problem_id=problem.id,
+        title=config.title,
+        description=config.description,
+        target_number=problem.target_number,
+        optimal_cost=problem.optimal_cost,
+        updated_at=config.updated_at,
+    )
+
+
+@router.post("/special-game/config", response_model=SpecialGameConfigState)
+async def upsert_special_game_config(
+    payload: SpecialGameConfigPayload,
+    session: AsyncSession = Depends(get_session),
+) -> SpecialGameConfigState:
+    problem = await session.get(Problem, payload.problem_id)
+    if not problem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="문제를 찾을 수 없습니다.")
+
+    config = await _get_or_create_special_config(session)
+    config.problem_id = problem.id
+    config.title = _sanitize_optional(payload.title)
+    config.description = _sanitize_optional(payload.description)
+    config.updated_at = datetime.utcnow()
+    session.add(config)
+    await session.commit()
+    await session.refresh(config)
+
+    return SpecialGameConfigState(
+        problem_id=problem.id,
+        title=config.title,
+        description=config.description,
+        target_number=problem.target_number,
+        optimal_cost=problem.optimal_cost,
+        updated_at=config.updated_at,
+    )
 
 
 def _normalize_header(value: str) -> str:

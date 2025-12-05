@@ -12,7 +12,7 @@ from .config import get_settings
 from .database import init_db, async_session_factory
 from .events.manager import manager
 from .models import User
-from .routers import auth, users, rooms, tournaments, dashboard, admin
+from .routers import auth, users, rooms, tournaments, dashboard, admin, special_game
 from .security import decode_token
 from .services.room_cleanup import delete_idle_rooms
 
@@ -46,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(tournaments.router, prefix=settings.api_prefix)
     app.include_router(dashboard.router, prefix=settings.api_prefix)
     app.include_router(admin.router, prefix=settings.api_prefix)
+    app.include_router(special_game.router, prefix=settings.api_prefix)
 
     @app.get("/healthz")
     async def healthcheck():

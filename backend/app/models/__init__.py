@@ -5,6 +5,7 @@ from .submission import Submission
 from .team import Team, TeamMember
 from .tournament import Tournament, TournamentSlot, TournamentMatch
 from .problem import Problem
+from .special_game import SpecialGameAttempt, SpecialGameConfig
 
 __all__ = [
     "User",
@@ -19,5 +20,7 @@ __all__ = [
     "TournamentSlot",
     "TournamentMatch",
     "Problem",
+    "SpecialGameConfig",
+    "SpecialGameAttempt",
 ]
 

@@ -22,6 +22,7 @@ type NavButton = {
 const NAV_BUTTONS: NavButton[] = [
   { id: "create-room", label: "방 만들기", hint: "NEW", href: "/rooms/create" },
   { id: "join-game", label: "게임 참여", hint: "JOIN", href: "/rooms" },
+  { id: "special-game", label: "Special Game", hint: "EVENT", href: "/special-game" },
   { id: "ranking", label: "랭킹", hint: "RANK", href: "/rankings" },
   { id: "logout", label: "로그아웃", hint: "EXIT", action: "quit" },
 ];

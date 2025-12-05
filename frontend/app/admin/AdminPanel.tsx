@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/hooks/useAuth";
 import api from "@/lib/api";
-import type { Problem, ResetSummary, UserResetResponse } from "@/types/api";
+import type { Problem, ResetSummary, SpecialGameConfig, UserResetResponse } from "@/types/api";
 
 const roundTypeLabels: Record<string, string> = {
   round1_individual: "1라운드 개인전",
@@ -26,6 +26,12 @@ export default function AdminPanel() {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [specialConfig, setSpecialConfig] = useState<SpecialGameConfig | null>(null);
+  const [specialConfigLoading, setSpecialConfigLoading] = useState(false);
+  const [specialConfigSaving, setSpecialConfigSaving] = useState(false);
+  const [specialForm, setSpecialForm] = useState({ problem_id: "", title: "", description: "" });
+  const [specialConfigError, setSpecialConfigError] = useState<string | null>(null);
+  const [specialConfigSuccess, setSpecialConfigSuccess] = useState<string | null>(null);
   const [resetResult, setResetResult] = useState<ResetSummary | null>(null);
   const [resetUserMessage, setResetUserMessage] = useState<string | null>(null);
   const [resetUserError, setResetUserError] = useState<string | null>(null);
@@ -54,9 +60,44 @@ export default function AdminPanel() {
     }
   }, [user?.is_admin]);
 
+  const fetchSpecialConfig = useCallback(async () => {
+    if (!user?.is_admin) return;
+    setSpecialConfigLoading(true);
+    setSpecialConfigError(null);
+    setSpecialConfigSuccess(null);
+    try {
+      const { data } = await api.get<SpecialGameConfig | null>("/admin/special-game/config");
+      setSpecialConfig(data ?? null);
+      if (data) {
+        setSpecialForm({
+          problem_id: data.problem_id,
+          title: data.title ?? "",
+          description: data.description ?? "",
+        });
+      } else {
+        setSpecialForm((prev) => ({
+          ...prev,
+          title: "",
+          description: "",
+        }));
+      }
+    } catch (err: any) {
+      setSpecialConfigError(err?.response?.data?.detail ?? "Special Game 구성을 불러오지 못했습니다.");
+    } finally {
+      setSpecialConfigLoading(false);
+    }
+  }, [user?.is_admin]);
+
   useEffect(() => {
     fetchProblems();
-  }, [fetchProblems]);
+    fetchSpecialConfig();
+  }, [fetchProblems, fetchSpecialConfig]);
+
+  useEffect(() => {
+    if (!specialConfig && !specialForm.problem_id && problems.length) {
+      setSpecialForm((prev) => ({ ...prev, problem_id: problems[0].id }));
+    }
+  }, [problems, specialConfig, specialForm.problem_id]);
 
   if (!user) {
     return <p className="text-night-300">로그인이 필요합니다.</p>;
@@ -69,6 +110,13 @@ export default function AdminPanel() {
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSpecialFormChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = event.target;
+    setSpecialForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleUserReset = async (event: FormEvent<HTMLFormElement>) => {
@@ -102,6 +150,36 @@ export default function AdminPanel() {
       fetchProblems();
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? "문제를 추가하지 못했습니다.");
+    }
+  };
+
+  const handleSpecialSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!specialForm.problem_id) {
+      setSpecialConfigError("Special Game에 사용할 문제를 먼저 선택해 주세요.");
+      return;
+    }
+    setSpecialConfigError(null);
+    setSpecialConfigSuccess(null);
+    setSpecialConfigSaving(true);
+    try {
+      const payload = {
+        problem_id: specialForm.problem_id,
+        title: specialForm.title.trim() || undefined,
+        description: specialForm.description.trim() || undefined,
+      };
+      const { data } = await api.post<SpecialGameConfig>("/admin/special-game/config", payload);
+      setSpecialConfig(data);
+      setSpecialForm({
+        problem_id: data.problem_id,
+        title: data.title ?? "",
+        description: data.description ?? "",
+      });
+      setSpecialConfigSuccess("Special Game 구성을 저장했습니다.");
+    } catch (err: any) {
+      setSpecialConfigError(err?.response?.data?.detail ?? "Special Game 구성을 저장하지 못했습니다.");
+    } finally {
+      setSpecialConfigSaving(false);
     }
   };
 
@@ -335,6 +413,84 @@ export default function AdminPanel() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-night-800 bg-night-950/50 p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Special Game 문제 지정</h2>
+            <p className="text-sm text-night-400">
+              사이드 메뉴 Special Game이 참조할 문제와 소개 문구를 설정합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchSpecialConfig}
+            className="rounded-md border border-night-700 px-3 py-1 text-xs text-night-100 transition hover:border-night-500 hover:text-white"
+          >
+            구성 새로고침
+          </button>
+        </div>
+        <form onSubmit={handleSpecialSubmit} className="mt-4 grid gap-4 md:grid-cols-2">
+          <label className="text-sm text-night-300 md:col-span-2">
+            <span className="mb-1 block text-night-400">문제 선택</span>
+            <select
+              name="problem_id"
+              value={specialForm.problem_id}
+              onChange={handleSpecialFormChange}
+              disabled={!problems.length || specialConfigSaving}
+              className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+            >
+              {!problems.length && <option value="">문제를 먼저 등록해 주세요.</option>}
+              {problems.map((problem) => (
+                <option key={problem.id} value={problem.id}>
+                  {problem.target_number} · 최적 {problem.optimal_cost}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-night-300">
+            <span className="mb-1 block text-night-400">타이틀 (선택)</span>
+            <input
+              name="title"
+              value={specialForm.title}
+              onChange={handleSpecialFormChange}
+              placeholder="예) 2025 Winter Special"
+              className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+              disabled={specialConfigSaving}
+            />
+          </label>
+          <label className="text-sm text-night-300">
+            <span className="mb-1 block text-night-400">설명 (선택)</span>
+            <textarea
+              name="description"
+              value={specialForm.description}
+              onChange={handleSpecialFormChange}
+              rows={3}
+              className="w-full rounded-md border border-night-800 bg-night-900 px-3 py-2 text-white focus:border-indigo-500 focus:outline-none"
+              disabled={specialConfigSaving}
+            />
+          </label>
+          <div className="md:col-span-2">
+            <button
+              type="submit"
+              disabled={!specialForm.problem_id || specialConfigSaving}
+              className="w-full rounded-md bg-fuchsia-600 py-2 text-sm font-semibold text-white transition hover:bg-fuchsia-500 disabled:opacity-60"
+            >
+              {specialConfigSaving ? "저장 중..." : "Special Game 적용"}
+            </button>
+            {specialConfigLoading && <p className="mt-2 text-xs text-night-400">구성을 불러오는 중입니다...</p>}
+            {specialConfigError && <p className="mt-2 text-xs text-red-400">{specialConfigError}</p>}
+            {specialConfigSuccess && <p className="mt-2 text-xs text-emerald-400">{specialConfigSuccess}</p>}
+            {specialConfig && (
+              <p className="mt-3 text-xs text-night-400">
+                현재 적용 문제: 목표 {specialConfig.target_number ?? "?"} · 최적{" "}
+                {specialConfig.optimal_cost ?? "?"} (업데이트{" "}
+                {specialConfig.updated_at ? new Date(specialConfig.updated_at).toLocaleString("ko-KR") : "미정"})
+              </p>
+            )}
+          </div>
+        </form>
       </div>
 
       <div className="rounded-xl border border-night-800 bg-night-950/50 p-5">

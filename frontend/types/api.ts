@@ -134,3 +134,32 @@ export interface ActiveMatch {
   player_two_id?: string | null;
 }
 
+export interface SpecialGameConfig {
+  problem_id: string;
+  title?: string | null;
+  description?: string | null;
+  target_number?: number | null;
+  optimal_cost?: number | null;
+  updated_at?: string | null;
+}
+
+export interface SpecialGameLeaderboardEntry {
+  user_id: string;
+  username: string;
+  expression: string;
+  symbol_count: number;
+  recorded_at: string;
+}
+
+export interface SpecialGameContext {
+  config: SpecialGameConfig | null;
+  leaderboard: SpecialGameLeaderboardEntry[];
+}
+
+export interface SpecialGameSubmissionResponse {
+  expression: string;
+  symbol_count: number;
+  is_record: boolean;
+  message: string;
+}
+
