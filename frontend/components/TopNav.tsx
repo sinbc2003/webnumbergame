@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLobby } from "@/hooks/useLobby";
 import { ShellTransitionProvider } from "@/hooks/useShellTransition";
 import { getRuntimeConfig } from "@/lib/runtimeConfig";
+import { getTierFromScore } from "@/lib/tiers";
 
 type NavButton = {
   id: string;
@@ -98,7 +99,15 @@ export default function MathNetworkShell({
         const map: Record<string, number> = {};
         entries.forEach((entry: any) => {
           if (entry?.user_id) {
-            map[entry.user_id] = entry.total_score ?? entry.performance_score ?? 0;
+            const score =
+              typeof entry.performance_score === "number"
+                ? entry.performance_score
+                : typeof entry.total_score === "number"
+                  ? entry.total_score
+                  : typeof entry.rating === "number"
+                    ? entry.rating
+                    : 0;
+            map[entry.user_id] = score;
           }
         });
         setScoreMap(map);
@@ -106,15 +115,6 @@ export default function MathNetworkShell({
       .catch(() => {});
     return () => controller.abort();
   }, []);
-
-  const badgeFromScore = (score: number) => {
-    if (score >= 500) return "platinum";
-    if (score >= 400) return "ruby";
-    if (score >= 300) return "diamond";
-    if (score >= 200) return "gold";
-    if (score >= 100) return "silver";
-    return "bronze";
-  };
 
   const navButtons = useMemo(() => {
     if (user?.is_admin) {
@@ -131,7 +131,7 @@ export default function MathNetworkShell({
     if (!roster.length) return [];
     return roster.map((entry, index) => {
       const score = scoreMap[entry.user_id] ?? 0;
-      const badge = badgeFromScore(score);
+      const badge = getTierFromScore(score);
       const signal = ((entry.username?.charCodeAt(0) ?? index) % 4) + 1;
       return { ...entry, badge, signal, score };
     });
