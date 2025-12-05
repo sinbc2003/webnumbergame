@@ -36,6 +36,9 @@ export default function AdminPanel() {
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [cleanupStatus, setCleanupStatus] = useState<string | null>(null);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
 
   const fetchProblems = useCallback(async () => {
     if (!user?.is_admin) return;
@@ -158,6 +161,22 @@ export default function AdminPanel() {
       router.refresh();
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? "초기화에 실패했습니다.");
+    }
+  };
+
+  const handleCleanupEmptyRooms = async () => {
+    if (!confirm("참가자가 없는 빈 방을 모두 삭제할까요?")) return;
+    setCleanupError(null);
+    setCleanupStatus(null);
+    setCleanupLoading(true);
+    try {
+      const { data } = await api.delete<{ deleted: number }>("/admin/rooms/empty");
+      setCleanupStatus(`${data.deleted}개의 빈 방을 삭제했습니다.`);
+      router.refresh();
+    } catch (err: any) {
+      setCleanupError(err?.response?.data?.detail ?? "빈 방 정리에 실패했습니다.");
+    } finally {
+      setCleanupLoading(false);
     }
   };
 
@@ -363,6 +382,20 @@ export default function AdminPanel() {
             {resetUserMessage && <p className="mt-2 text-xs text-green-400">{resetUserMessage}</p>}
           </div>
         </form>
+      </div>
+
+      <div className="rounded-xl border border-night-800 bg-night-950/40 p-5">
+        <h2 className="text-lg font-semibold text-white">빈 방 정리</h2>
+        <p className="mt-1 text-sm text-night-400">참가자가 전혀 없는 방만 찾아 빠르게 삭제합니다.</p>
+        <button
+          onClick={handleCleanupEmptyRooms}
+          disabled={cleanupLoading}
+          className="mt-4 w-full rounded-md border border-night-700 bg-night-900 py-2 text-sm font-semibold text-white transition hover:border-indigo-500 disabled:opacity-60"
+        >
+          {cleanupLoading ? "정리 중..." : "빈 방 즉시 삭제"}
+        </button>
+        {cleanupError && <p className="mt-2 text-sm text-red-400">{cleanupError}</p>}
+        {cleanupStatus && <p className="mt-2 text-sm text-emerald-300">{cleanupStatus}</p>}
       </div>
 
       <div className="rounded-xl border border-red-900/60 bg-red-900/10 p-5 text-sm text-red-100">

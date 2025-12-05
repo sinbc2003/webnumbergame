@@ -27,6 +27,20 @@ const fetchRooms = async () => {
   return data;
 };
 
+const formatRoomCreatedAt = (value?: string | null) => {
+  if (!value) return "-";
+  const hasTimezone = /([+-]\d{2}:?\d{2}|z)$/i.test(value);
+  const normalized = hasTimezone ? value : `${value}Z`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 export default function RoomHub({ initialRooms, view, showTabs = false }: RoomHubProps) {
   const [currentView, setCurrentView] = useState<"join" | "create">(view);
   const activeView = showTabs ? currentView : view;
@@ -122,7 +136,7 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
                 <span className="room-list__players">-- / {room.max_players}</span>
                 <span className="room-list__name">{room.name}</span>
                 <span>{describeRoomMode({ mode: room.mode, team_size: room.team_size })}</span>
-                <span>{new Date(room.created_at).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</span>
+                <span>{formatRoomCreatedAt(room.created_at)}</span>
               </button>
             ))}
             {filtered.length === 0 && <p className="room-list__empty">조건에 맞는 방이 없습니다.</p>}
@@ -148,6 +162,10 @@ function RoomJoinPanel({ rooms }: { rooms: Room[] }) {
               <div>
                 <dt>Room Code</dt>
                 <dd>{selectedRoom.code}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatRoomCreatedAt(selectedRoom.created_at)}</dd>
               </div>
             </dl>
             <p className="room-join__desc">{selectedRoom.description ?? "설명 없음"}</p>
