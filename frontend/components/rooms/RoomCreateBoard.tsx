@@ -62,7 +62,6 @@ const MODE_OPTIONS: ModeOption[] = [
     id: "team",
     label: "팀전",
     description: "2라운드 레퍼런스 룰",
-    helper: "‘참고’ 폴더의 2라운드 팀전처럼 하나의 수식을 순차 입력합니다.",
     roundType: "round2_team",
     mode: "team",
     accent: "indigo",
