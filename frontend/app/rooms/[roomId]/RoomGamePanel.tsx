@@ -116,6 +116,12 @@ type RoundOutcome = {
   isOptimal?: boolean;
 };
 
+interface VictoryHighlight {
+  winnerId: string;
+  winnerLabel: string;
+  scoreGain: number | null;
+}
+
 interface MatchSummary {
   finishedAt: string;
   reason: string;
@@ -348,6 +354,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   const [lastWinnerLabel, setLastWinnerLabel] = useState<string | null>(null);
   const [lastWinReason, setLastWinReason] = useState<string | null>(null);
   const [advancePrompt, setAdvancePrompt] = useState<AdvancePromptState | null>(null);
+  const [victoryHighlight, setVictoryHighlight] = useState<VictoryHighlight | null>(null);
 
   const playerIdsRef = useRef<{ playerOne: string | undefined; playerTwo: string | undefined }>({
     playerOne: initialPlayerOne,
@@ -383,6 +390,18 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   useEffect(() => {
     setParticipantState(participants);
   }, [participants]);
+
+  useEffect(() => {
+    if (!victoryHighlight) return;
+    const timeout = setTimeout(() => setVictoryHighlight(null), 8000);
+    return () => clearTimeout(timeout);
+  }, [victoryHighlight]);
+
+  useEffect(() => {
+    if (teamSize !== 1) {
+      setVictoryHighlight(null);
+    }
+  }, [teamSize]);
 
   useEffect(() => {
     if (!isRelayRoom) {
@@ -598,6 +617,21 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     return (
       <div className={`rounded-2xl border border-night-800/70 bg-night-950/30 p-4 text-night-200 ${className}`}>
         <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">SCORE BOARD</p>
+        {teamSize === 1 && victoryHighlight && (
+          <div className="mt-3 rounded-2xl border border-emerald-400/60 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="font-semibold text-white">{victoryHighlight.winnerLabel} 님이 승리했습니다!</p>
+              {typeof victoryHighlight.scoreGain === "number" && (
+                <span className="rounded-full border border-emerald-300/50 px-3 py-1 text-xs font-semibold text-emerald-50">
+                  +{victoryHighlight.scoreGain} 티어 점수
+                </span>
+              )}
+            </div>
+            {victoryHighlight.winnerId === user?.id && (
+              <p className="mt-1 text-[11px] text-emerald-200/80">내 티어 점수가 상승했습니다.</p>
+            )}
+          </div>
+        )}
         <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <div>
             <p className="text-xs text-night-500">{slotLabels.playerOne}</p>
@@ -1007,6 +1041,13 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   ? "목표 달성"
                   : "최종 판정";
         setLastWinReason(reasonLabel);
+        if (teamSize === 1) {
+          setVictoryHighlight({
+            winnerId,
+            winnerLabel,
+            scoreGain: typeof winnerSubmission?.score === "number" ? winnerSubmission.score : null,
+          });
+        }
         if (winnerId === playerIdsRef.current.playerOne) {
           setScoreboard((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
           setProblemWins((prev) => ({ ...prev, playerOne: prev.playerOne + 1 }));
@@ -1048,12 +1089,18 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       } else if (reason === "timeout") {
         setStatusMessage("시간 종료! 제출된 식이 없어 무승부입니다.");
         setStatusError(null);
+        if (teamSize === 1) {
+          setVictoryHighlight(null);
+        }
       } else if (reason === "forfeit") {
         setStatusMessage("상대가 나가 라운드가 종료되었습니다.");
         setStatusError(null);
+        if (teamSize === 1) {
+          setVictoryHighlight(null);
+        }
       }
     },
-    [participantLabel, playTone, user?.id],
+    [participantLabel, playTone, teamSize, user?.id],
   );
 
   useEffect(() => {
@@ -1186,6 +1233,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             setProblemWins({ playerOne: 0, playerTwo: 0 });
             setLastWinnerLabel(null);
             setLastWinReason(null);
+          setVictoryHighlight(null);
             setStatusMessage("새 라운드가 시작되었습니다. 카운트다운 후 입력이 열립니다.");
             setStatusError(null);
             setRoundOutcome(null);
@@ -1353,6 +1401,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                     : "방이 종료되었습니다.",
             );
             setShowSummary(true);
+            setVictoryHighlight(null);
             break;
           }
           case "chat_message": {
@@ -1697,6 +1746,21 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               </div>
             </div>
           </div>
+          {victoryHighlight && (
+            <div className="rounded-3xl border border-emerald-400/60 bg-emerald-600/10 p-4 text-sm text-emerald-100 shadow-[0_18px_45px_rgba(0,0,0,0.45)]">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-base font-semibold text-white">{victoryHighlight.winnerLabel} 님이 승리했습니다!</p>
+                {typeof victoryHighlight.scoreGain === "number" && (
+                  <span className="rounded-full border border-emerald-300/60 px-4 py-1 text-xs font-semibold text-emerald-50">
+                    +{victoryHighlight.scoreGain} 티어 점수
+                  </span>
+                )}
+              </div>
+              {victoryHighlight.winnerId === user?.id && (
+                <p className="mt-1 text-[12px] text-emerald-200/80">내 티어 점수가 상승했습니다.</p>
+              )}
+            </div>
+          )}
 
           <div className="rounded-[32px] border border-night-800/70 bg-night-950/70 p-5 shadow-[0_25px_60px_rgba(0,0,0,0.55)] sm:p-6">
             <PlayerPanel
