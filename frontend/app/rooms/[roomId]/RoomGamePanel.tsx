@@ -2501,7 +2501,7 @@ function PlayerPanel({
           <div className="rounded-3xl border border-night-800/70 bg-night-950/40 p-4">
             <p className="text-sm font-semibold text-white">최근 히스토리</p>
             <div className="mt-3 space-y-3">
-              <div className="flex h-[360px] flex-col overflow-hidden rounded-2xl border border-night-800/40 bg-night-900/20">
+              <div className="flex h-[120px] flex-col overflow-hidden rounded-2xl border border-night-800/40 bg-night-900/20">
                 {history.length === 0 ? (
                   <div className="flex h-full items-center justify-center px-4 text-sm text-night-500">
                     아직 제출 기록이 없습니다.
