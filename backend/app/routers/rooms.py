@@ -160,6 +160,7 @@ async def _ensure_host_active(session: AsyncSession, room: Room) -> None:
     if host:
         return
 
+    await session.execute(delete(RoomParticipant).where(RoomParticipant.room_id == room.id))
     await session.delete(room)
     await session.commit()
     await manager.broadcast_room(
