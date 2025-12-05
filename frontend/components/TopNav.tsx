@@ -58,7 +58,7 @@ export default function MathNetworkShell({
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { messages, roster, connected, sendMessage } = useLobby();
+  const { messages, roster, connected, sendMessage, setPresenceState } = useLobby();
   const [chatInput, setChatInput] = useState("");
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const [transitioning, setTransitioning] = useState(false);
@@ -68,6 +68,14 @@ export default function MathNetworkShell({
   const shouldShowConsole = showChat || !showContent;
   const isFocus = layout === "focus";
   const [scoreMap, setScoreMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    const nextState = layout === "focus" ? "standby" : "active";
+    setPresenceState(nextState);
+    return () => {
+      setPresenceState("standby");
+    };
+  }, [layout, setPresenceState]);
 
   useEffect(() => {
     if (chatScrollRef.current) {

@@ -19,11 +19,15 @@ type LobbyUser = {
   username: string;
 };
 
+type LobbyPresenceState = "active" | "standby";
+
 interface LobbyContextValue {
   messages: LobbyMessage[];
   roster: LobbyUser[];
   connected: boolean;
   sendMessage: (text: string) => void;
+  presenceState: LobbyPresenceState;
+  setPresenceState: (state: LobbyPresenceState) => void;
 }
 
 const LobbyContext = createContext<LobbyContextValue>({
@@ -31,6 +35,8 @@ const LobbyContext = createContext<LobbyContextValue>({
   roster: [],
   connected: false,
   sendMessage: () => {},
+  presenceState: "standby",
+  setPresenceState: () => {},
 });
 
 const resolveWsBase = () => {
@@ -45,6 +51,7 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<LobbyMessage[]>([]);
   const [roster, setRoster] = useState<LobbyUser[]>([]);
   const [connected, setConnected] = useState(false);
+  const [presenceState, setPresenceState] = useState<LobbyPresenceState>("active");
   const wsRef = useRef<WebSocket | null>(null);
   const pendingIdsRef = useRef<Set<string>>(new Set());
   const retryRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; attempts: number }>({
@@ -53,7 +60,7 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    if (!user || !token) {
+    if (!user || !token || presenceState !== "active") {
       setConnected(false);
       setMessages([]);
       setRoster([]);
@@ -155,7 +162,7 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
         wsRef.current = null;
       }
     };
-  }, [token, user]);
+  }, [presenceState, token, user]);
 
   const sendMessage = (text: string) => {
     const trimmed = text.trim();
@@ -191,8 +198,10 @@ export function LobbyProvider({ children }: { children: React.ReactNode }) {
       roster,
       connected,
       sendMessage,
+      presenceState,
+      setPresenceState,
     }),
-    [connected, messages, roster],
+    [connected, messages, presenceState, roster],
   );
 
   return <LobbyContext.Provider value={value}>{children}</LobbyContext.Provider>;
