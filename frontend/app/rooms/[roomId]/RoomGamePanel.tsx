@@ -150,9 +150,11 @@ const sanitizeExpression = (value: string) =>
     .filter((char) => allowedTokens.has(char))
     .join("");
 const normalizedForEvaluation = (value: string): string => sanitizeExpression(value).trim();
+const containsExponentOperator = (value: string): boolean => value.includes("**");
 const computeExpressionValue = (value: string): number | null => {
   const sanitized = normalizedForEvaluation(value);
   if (!sanitized) return null;
+  if (containsExponentOperator(sanitized)) return null;
   if (/[\+\*\(]$/.test(sanitized)) return null;
   try {
     const result = Function(`"use strict"; return (${sanitized});`)();
@@ -170,6 +172,7 @@ const countOperators = (expression: string): number =>
     .filter((char) => allowedTokens.has(char))
     .length;
 const INPUT_WARNING = "사용 가능한 기호는 1, +, *, (, ) 만 허용됩니다.";
+const EXPONENT_WARNING = "지수 연산(**)은 사용할 수 없습니다.";
 const CRITICAL_COUNTDOWN_THRESHOLD = 5;
 const TEAM_ALLOWED_SYMBOLS: Array<{ symbol: string; label: string }> = [
   { symbol: "1", label: "1" },
@@ -559,12 +562,18 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
         [slot]: { ...prev[slot], expression: rawValue },
       }));
       const sanitized = sanitizeExpression(rawValue);
-      setPendingInput({ slot, value: sanitized });
+      const usesExponent = containsExponentOperator(sanitized);
+      const warning = sanitized !== rawValue ? INPUT_WARNING : usesExponent ? EXPONENT_WARNING : null;
+      if (usesExponent) {
+        setPendingInput(null);
+      } else {
+        setPendingInput({ slot, value: sanitized });
+      }
       setInputWarnings((prev) => ({
         ...prev,
-        [slot]: sanitized !== rawValue ? INPUT_WARNING : null,
+        [slot]: warning,
       }));
-      if (sanitized !== rawValue) {
+      if (warning) {
         playTone("error");
       }
     },
@@ -1527,6 +1536,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   useEffect(() => {
     if (!pendingInput || pendingInput.slot !== mySlot) return;
     if (!pendingInput.value.trim()) return;
+    if (containsExponentOperator(pendingInput.value)) return;
     const timeout = setTimeout(() => {
       api.post(`/rooms/${roomId}/inputs`, { expression: pendingInput.value }).catch(() => {});
     }, 250);
@@ -1539,6 +1549,15 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     const sanitized = normalizedForEvaluation(rawValue);
     if (!sanitized) {
       setStatusError("식을 입력해 주세요.");
+      return;
+    }
+    if (containsExponentOperator(sanitized)) {
+      setStatusError(EXPONENT_WARNING);
+      setInputWarnings((prev) => ({
+        ...prev,
+        [slot]: EXPONENT_WARNING,
+      }));
+      playTone("error");
       return;
     }
     setSubmittingSlot(slot);
