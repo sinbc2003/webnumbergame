@@ -27,6 +27,7 @@ from ..models import (
 from ..schemas.problem import ProblemCreate, ProblemPublic, ProblemUpdate, ResetSummary
 from ..schemas.admin import UserResetRequest, UserResetResponse
 from ..schemas.user import UserPublic
+from ..services.room_cleanup import delete_empty_rooms as service_delete_empty_rooms
 
 router = APIRouter(
     prefix="/admin",
@@ -236,47 +237,8 @@ async def reset_arena(session: AsyncSession = Depends(get_session)) -> ResetSumm
 
 @router.delete("/rooms/empty")
 async def delete_empty_rooms(session: AsyncSession = Depends(get_session)) -> dict:
-    subquery = select(RoomParticipant.room_id)
-    room_ids = (
-        await session.execute(
-            select(Room.id)
-            .where(Room.status != RoomStatus.ARCHIVED)
-            .where(~Room.id.in_(subquery))
-        )
-    ).scalars().all()
-
-    if not room_ids:
-        return {"deleted": 0}
-
-    match_ids = (
-        await session.execute(select(Match.id).where(Match.room_id.in_(room_ids)))
-    ).scalars().all()
-
-    if match_ids:
-        await session.execute(
-            sa_update(Match).where(Match.id.in_(match_ids)).values(winning_submission_id=None)
-        )
-        await session.execute(
-            sa_delete(Submission).where(Submission.match_id.in_(match_ids))
-        )
-        await session.execute(
-            sa_delete(RoundSnapshot).where(RoundSnapshot.match_id.in_(match_ids))
-        )
-        await session.execute(sa_delete(Match).where(Match.id.in_(match_ids)))
-
-    team_ids = (
-        await session.execute(select(Team.id).where(Team.room_id.in_(room_ids)))
-    ).scalars().all()
-
-    if team_ids:
-        await session.execute(sa_delete(TeamMember).where(TeamMember.team_id.in_(team_ids)))
-        await session.execute(sa_delete(Team).where(Team.id.in_(team_ids)))
-
-    await session.execute(sa_delete(RoomParticipant).where(RoomParticipant.room_id.in_(room_ids)))
-    await session.execute(sa_delete(Room).where(Room.id.in_(room_ids)))
-    await session.commit()
-
-    return {"deleted": len(room_ids)}
+    deleted = await service_delete_empty_rooms(session, reason="admin_cleanup")
+    return {"deleted": deleted}
 
 
 @router.post("/users/reset", response_model=UserResetResponse)

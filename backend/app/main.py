@@ -1,5 +1,7 @@
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
+from datetime import datetime, timezone, timedelta
 from typing import AsyncGenerator
 import json
 
@@ -12,14 +14,20 @@ from .events.manager import manager
 from .models import User
 from .routers import auth, users, rooms, tournaments, dashboard, admin
 from .security import decode_token
+from .services.room_cleanup import delete_idle_rooms
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await init_db()
+    cleanup_task = asyncio.create_task(_room_cleanup_loop())
     yield
+    cleanup_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await cleanup_task
 
 
 def create_app() -> FastAPI:
@@ -117,6 +125,24 @@ def create_app() -> FastAPI:
             await manager.broadcast_lobby({"type": "roster", "users": manager.lobby_roster})
 
     return app
+
+
+async def _room_cleanup_loop() -> None:
+    interval = max(60, settings.room_cleanup_interval_seconds)
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            cutoff = datetime.utcnow() - timedelta(minutes=max(5, settings.room_idle_minutes))
+            try:
+                async with async_session_factory() as session:
+                    deleted = await delete_idle_rooms(session, cutoff=cutoff, reason="idle_cleanup")
+                    if deleted:
+                        logger.info("Removed %s idle rooms", deleted)
+            except Exception:  # noqa: BLE001
+                logger.exception("Room cleanup loop failed")
+    except asyncio.CancelledError:
+        logger.debug("Room cleanup loop cancelled")
+        raise
 
 
 app = create_app()

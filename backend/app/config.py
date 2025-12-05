@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     max_room_capacity: int = 16
     db_init_max_retries: int = 5
     db_init_retry_interval_seconds: float = 2.0
+    room_idle_minutes: int = 60
+    room_cleanup_interval_seconds: int = 300
 
     @field_validator("database_url")
     @classmethod
