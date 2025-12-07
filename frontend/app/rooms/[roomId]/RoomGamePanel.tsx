@@ -199,6 +199,7 @@ const TEAM_MEMBER_LABEL_MAP: Record<number, string[]> = {
   4: ["1번 주자", "2번 주자", "3번 주자", "4번 주자"],
 };
 const TEAM_TOTAL_BUDGET = 32;
+const ROUND_HISTORY_LIMIT = 120;
 
 const createEmptyRelaySelections = (teamSize: number): RelaySelections => {
   const normalized = Math.max(0, teamSize);
@@ -298,6 +299,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   });
   const boardsRef = useRef<{ playerOne: BoardState; playerTwo: BoardState }>(boards);
   const lastProblemSnapshotRef = useRef<{ playerOne: HistoryEntry[]; playerTwo: HistoryEntry[] } | null>(null);
+  const roundHistoryRef = useRef<{ playerOne: HistoryEntry[]; playerTwo: HistoryEntry[] }>({
+    playerOne: [],
+    playerTwo: [],
+  });
   const [pendingInput, setPendingInput] = useState<{ slot: BoardSlot; value: string } | null>(null);
   const [submittingSlot, setSubmittingSlot] = useState<BoardSlot | null>(null);
   const playerTextareaRefs = useRef<Record<BoardSlot, HTMLTextAreaElement | null>>({
@@ -1001,10 +1006,9 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
 
   const handleProblemOutcome = useCallback(
     (payload: RoomEventPayload) => {
-      const snapshot = boardsRef.current;
       lastProblemSnapshotRef.current = {
-        playerOne: snapshot.playerOne.history.map((entry) => ({ ...entry })),
-        playerTwo: snapshot.playerTwo.history.map((entry) => ({ ...entry })),
+        playerOne: roundHistoryRef.current.playerOne.map((entry) => ({ ...entry })),
+        playerTwo: roundHistoryRef.current.playerTwo.map((entry) => ({ ...entry })),
       };
 
       const reason = payload.reason ?? "optimal";
@@ -1206,6 +1210,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   [slot]: { ...prev[slot], history: nextHistory },
                 };
               });
+              roundHistoryRef.current[slot] = [
+                entry,
+                ...roundHistoryRef.current[slot],
+              ].slice(0, ROUND_HISTORY_LIMIT);
             }
             if (payload.submission.user_id && payload.submission.user_id === user?.id) {
               if (payload.submission.distance === 0) {
@@ -1240,6 +1248,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             setInitialRemaining(null);
             tickRef.current = null;
             lastProblemSnapshotRef.current = null;
+            roundHistoryRef.current = { playerOne: [], playerTwo: [] };
             setAdvancePrompt(null);
             triggerPreCountdown();
             mutate();
@@ -1300,16 +1309,15 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               };
             }
 
-            const historySource =
-              lastProblemSnapshotRef.current ??
-              {
-                playerOne: boardsRef.current.playerOne.history,
-                playerTwo: boardsRef.current.playerTwo.history,
-              };
-            const historySnapshot = {
-              playerOne: historySource.playerOne.map((entry) => ({ ...entry })),
-              playerTwo: historySource.playerTwo.map((entry) => ({ ...entry })),
-            };
+            const historySnapshot = lastProblemSnapshotRef.current
+              ? {
+                  playerOne: lastProblemSnapshotRef.current.playerOne.map((entry) => ({ ...entry })),
+                  playerTwo: lastProblemSnapshotRef.current.playerTwo.map((entry) => ({ ...entry })),
+                }
+              : {
+                  playerOne: roundHistoryRef.current.playerOne.map((entry) => ({ ...entry })),
+                  playerTwo: roundHistoryRef.current.playerTwo.map((entry) => ({ ...entry })),
+                };
             lastProblemSnapshotRef.current = null;
 
             setPreCountdown(null);
@@ -1365,8 +1373,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               setStatusError("방장이 방을 종료했습니다.");
             }
             const summaryHistories = {
-              playerOne: boardsRef.current.playerOne.history.map((entry) => ({ ...entry })),
-              playerTwo: boardsRef.current.playerTwo.history.map((entry) => ({ ...entry })),
+              playerOne: roundHistoryRef.current.playerOne.map((entry) => ({ ...entry })),
+              playerTwo: roundHistoryRef.current.playerTwo.map((entry) => ({ ...entry })),
             };
             setMatchSummary((prev) => {
               if (prev) {
