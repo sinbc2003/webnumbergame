@@ -142,6 +142,20 @@ interface MatchSummary {
     playerOneLabel: string;
     playerTwoLabel: string;
   };
+  problems: ProblemSummary[];
+  finalScore: {
+    playerOne: number;
+    playerTwo: number;
+  };
+}
+
+interface ProblemSummary {
+  problemNumber: number;
+  winnerId: string | null;
+  winnerLabel: string;
+  expression: string | null;
+  operatorCount: number | null;
+  reason: string;
 }
 
 interface AdvancePromptState {
@@ -200,6 +214,14 @@ const TEAM_MEMBER_LABEL_MAP: Record<number, string[]> = {
 };
 const TEAM_TOTAL_BUDGET = 32;
 const ROUND_HISTORY_LIMIT = 120;
+type InternalProblemSummary = {
+  problemIndex: number;
+  winnerId: string | null;
+  winnerLabel: string;
+  expression: string | null;
+  operatorCount: number | null;
+  reason: string;
+};
 
 const createEmptyRelaySelections = (teamSize: number): RelaySelections => {
   const normalized = Math.max(0, teamSize);
@@ -303,6 +325,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerOne: [],
     playerTwo: [],
   });
+  const roundProblemSummariesRef = useRef<InternalProblemSummary[]>([]);
   const [pendingInput, setPendingInput] = useState<{ slot: BoardSlot; value: string } | null>(null);
   const [submittingSlot, setSubmittingSlot] = useState<BoardSlot | null>(null);
   const playerTextareaRefs = useRef<Record<BoardSlot, HTMLTextAreaElement | null>>({
@@ -352,6 +375,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerOne: 0,
     playerTwo: 0,
   });
+  const problemWinsRef = useRef(problemWins);
   const [latestCostBySlot, setLatestCostBySlot] = useState<{ playerOne: number | null; playerTwo: number | null }>({
     playerOne: null,
     playerTwo: null,
@@ -373,6 +397,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     playerIdsRef.current.playerOne = next;
     setPlayerOne(next);
   }, [room.player_one_id]);
+
+  useEffect(() => {
+    problemWinsRef.current = problemWins;
+  }, [problemWins]);
 
   useEffect(() => {
     const next = room.player_two_id ?? undefined;
@@ -469,6 +497,55 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
   useEffect(() => {
     activeMatchRef.current = activeMatch;
   }, [activeMatch]);
+
+  const buildProblemSummaries = useCallback(
+    (totalProblems?: number | null): ProblemSummary[] => {
+      const targetLength =
+        typeof totalProblems === "number" && totalProblems > 0
+          ? totalProblems
+          : roundProblemSummariesRef.current.length;
+      return Array.from({ length: targetLength }, (_, index) => {
+        const stored = roundProblemSummariesRef.current[index];
+        if (stored) {
+          return {
+            problemNumber: index + 1,
+            winnerId: stored.winnerId,
+            winnerLabel: stored.winnerLabel,
+            expression: stored.expression,
+            operatorCount: stored.operatorCount,
+            reason: stored.reason,
+          };
+        }
+        return {
+          problemNumber: index + 1,
+          winnerId: null,
+          winnerLabel: "기록 없음",
+          expression: null,
+          operatorCount: null,
+          reason: "pending",
+        };
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!data) return;
+    if (data.player_one_id !== undefined) {
+      const normalized = data.player_one_id ?? undefined;
+      if (playerIdsRef.current.playerOne !== normalized) {
+        playerIdsRef.current.playerOne = normalized;
+        setPlayerOne(normalized);
+      }
+    }
+    if (data.player_two_id !== undefined) {
+      const normalized = data.player_two_id ?? undefined;
+      if (playerIdsRef.current.playerTwo !== normalized) {
+        playerIdsRef.current.playerTwo = normalized;
+        setPlayerTwo(normalized);
+      }
+    }
+  }, [data]);
 
   useEffect(() => {
     if (hasActiveMatch) {
@@ -1015,6 +1092,22 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       const winnerSubmission = payload.winner_submission ?? null;
       const winnerId =
         payload.winner_user_id ?? winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
+      const problemIndex =
+        typeof payload.problem_index === "number"
+          ? Math.max(0, payload.problem_index)
+          : roundProblemSummariesRef.current.length;
+      const winnerLabel = winnerId ? participantLabel(winnerId) : "무승부";
+      const nextProblemSummaries = [...roundProblemSummariesRef.current];
+      nextProblemSummaries[problemIndex] = {
+        problemIndex,
+        winnerId,
+        winnerLabel,
+        expression: winnerSubmission?.expression ?? null,
+        operatorCount:
+          typeof winnerSubmission?.cost === "number" ? winnerSubmission.cost : null,
+        reason,
+      };
+      roundProblemSummariesRef.current = nextProblemSummaries;
 
       setRoundOutcome({
         reason,
@@ -1032,7 +1125,6 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
       });
 
       if (winnerId) {
-        const winnerLabel = participantLabel(winnerId);
         setLastWinnerLabel(winnerLabel);
         const reasonLabel =
           reason === "timeout"
@@ -1232,6 +1324,16 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             break;
           }
           case "round_started": {
+            if (payload.player_one_id !== undefined) {
+              const normalized = payload.player_one_id ?? undefined;
+              playerIdsRef.current.playerOne = normalized;
+              setPlayerOne(normalized);
+            }
+            if (payload.player_two_id !== undefined) {
+              const normalized = payload.player_two_id ?? undefined;
+              playerIdsRef.current.playerTwo = normalized;
+              setPlayerTwo(normalized);
+            }
             setBoards({
               playerOne: createBoardState(),
               playerTwo: createBoardState(),
@@ -1249,6 +1351,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             tickRef.current = null;
             lastProblemSnapshotRef.current = null;
             roundHistoryRef.current = { playerOne: [], playerTwo: [] };
+            roundProblemSummariesRef.current = [];
             setAdvancePrompt(null);
             triggerPreCountdown();
             mutate();
@@ -1298,6 +1401,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             const winnerSubmission = payload.winner_submission;
             const winnerId =
               payload.winner_user_id ?? winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
+            const totalProblemsCount =
+              payload.total_problems ??
+              activeMatchRef.current?.total_problems ??
+              roundProblemSummariesRef.current.length;
+            const problemSummaries = buildProblemSummaries(totalProblemsCount);
+            const finalScore = problemWinsRef.current ?? { playerOne: 0, playerTwo: 0 };
 
             if (payload.include_problem_state !== false) {
               handleProblemOutcome(payload);
@@ -1355,6 +1464,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                 playerOneLabel: participantLabel(playerIdsRef.current.playerOne ?? undefined),
                 playerTwoLabel: participantLabel(playerIdsRef.current.playerTwo ?? undefined),
               },
+              problems: problemSummaries,
+              finalScore,
             });
             setShowSummary(true);
             setRoomClosedReason(null);
@@ -1376,6 +1487,10 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               playerOne: roundHistoryRef.current.playerOne.map((entry) => ({ ...entry })),
               playerTwo: roundHistoryRef.current.playerTwo.map((entry) => ({ ...entry })),
             };
+            const totalProblemsCount =
+              activeMatchRef.current?.total_problems ?? roundProblemSummariesRef.current.length;
+            const problemSummaries = buildProblemSummaries(totalProblemsCount);
+            const finalScore = problemWinsRef.current ?? { playerOne: 0, playerTwo: 0 };
             setMatchSummary((prev) => {
               if (prev) {
                 return prev;
@@ -1397,6 +1512,8 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   playerOneLabel: participantLabel(playerIdsRef.current.playerOne ?? undefined),
                   playerTwoLabel: participantLabel(playerIdsRef.current.playerTwo ?? undefined),
                 },
+                problems: problemSummaries,
+                finalScore,
               };
             });
             setRoomClosedReason(
@@ -1488,6 +1605,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     matchupLabel,
     applyActiveMatchPatch,
     handleProblemOutcome,
+    buildProblemSummaries,
   ]);
 
   useEffect(() => {
@@ -2730,27 +2848,19 @@ const translateSummaryReason = (reason: string) => {
       return "기권";
     case "optimal":
       return "최적 연산기호";
+    case "target_hit":
+      return "목표 달성";
+    case "pending":
+      return "기록 없음";
+    case "host_left":
+      return "방장 이탈";
+    case "host_left_forfeit":
+      return "방장 기권";
+    case "host_disconnected":
+      return "방장 연결 끊김";
     default:
       return "경기 종료";
   }
-};
-
-const computeHistoryStats = (history: HistoryEntry[]) => {
-  if (!history.length) {
-    return { attempts: 0, bestEntry: null, averageOperatorCount: null };
-  }
-  const bestEntry = history.reduce((best, entry) => {
-    if (!best) return entry;
-    if (entry.operatorCount < best.operatorCount) return entry;
-    if (entry.operatorCount === best.operatorCount) {
-      return entry.submittedAt < best.submittedAt ? entry : best;
-    }
-    return best;
-  }, history[0]);
-  const averageOperatorCount = Math.round(
-    history.reduce((sum, entry) => sum + entry.operatorCount, 0) / history.length,
-  );
-  return { attempts: history.length, bestEntry, averageOperatorCount };
 };
 
 function MatchSummaryCard({ summary, roomClosedReason, onClose, onReturn }: MatchSummaryCardProps) {
@@ -2774,29 +2884,24 @@ function MatchSummaryCard({ summary, roomClosedReason, onClose, onReturn }: Matc
   }
 
   const reasonLabel = translateSummaryReason(summary.reason);
-  const players = [
-    {
-      key: "playerOne",
-      label: summary.players.playerOneLabel,
-      history: summary.histories.playerOne,
-    },
-    {
-      key: "playerTwo",
-      label: summary.players.playerTwoLabel,
-      history: summary.histories.playerTwo,
-    },
-  ];
+  const totalProblems = summary.totalProblems ?? summary.problems.length;
+  const finalScore = summary.finalScore ?? { playerOne: 0, playerTwo: 0 };
+  const winnerHeadline = summary.winnerId
+    ? `최종 ${finalScore.playerOne}:${finalScore.playerTwo}로 ${summary.winnerLabel} 승`
+    : `최종 ${finalScore.playerOne}:${finalScore.playerTwo} · 무승부`;
+  const finalScoreLine = `${summary.players.playerOneLabel} ${finalScore.playerOne} : ${finalScore.playerTwo} ${summary.players.playerTwoLabel}`;
 
   return (
     <div className="rounded-3xl border border-amber-400/30 bg-night-950/70 p-5 text-sm text-night-200 shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-[11px] uppercase tracking-[0.4em] text-amber-300/70">Match Summary</p>
-          <p className="mt-1 text-2xl font-semibold text-white">
-            {summary.winnerId ? `${summary.winnerLabel} 승리` : "무승부"}
-          </p>
+          <p className="mt-1 text-2xl font-semibold text-white">{winnerHeadline}</p>
           <p className="text-xs text-night-400">
-            종료 사유: {reasonLabel} · {new Date(summary.finishedAt).toLocaleTimeString("ko-KR")}
+            {summary.matchup} · {totalProblems}문제 · 종료 사유 {reasonLabel}
+          </p>
+          <p className="text-[11px] text-night-500">
+            {new Date(summary.finishedAt).toLocaleTimeString("ko-KR")}
           </p>
         </div>
         <div className="text-right text-xs text-night-400">
@@ -2810,66 +2915,47 @@ function MatchSummaryCard({ summary, roomClosedReason, onClose, onReturn }: Matc
               최적 코스트 ≤ <span className="font-semibold text-white">{summary.optimalCost}</span>
             </p>
           )}
-          <p className="mt-1 text-night-500">{summary.matchup}</p>
         </div>
       </div>
-      {summary.winnerExpression && (
-        <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-50">
-          <p className="text-xs uppercase tracking-[0.3em] text-amber-200/80">Winner Expression</p>
-          <p className="mt-2 font-mono text-lg text-white">{summary.winnerExpression}</p>
-          {typeof summary.winnerOperatorCount === "number" && (
-            <p className="text-xs text-amber-200/80">연산기호 {summary.winnerOperatorCount}개</p>
+      <div className="mt-4 rounded-2xl border border-night-800/60 bg-night-900/40 p-4">
+        <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">Final Score</p>
+        <p className="mt-2 text-2xl font-black text-white">{finalScoreLine}</p>
+      </div>
+      <div className="mt-4">
+        <p className="text-[11px] uppercase tracking-[0.35em] text-night-500">문제별 리포트</p>
+        <div className="mt-3 space-y-2">
+          {summary.problems.length === 0 && (
+            <p className="text-sm text-night-400">아직 기록된 문제가 없습니다.</p>
           )}
-          {summary.winnerSubmittedAt && (
-            <p className="text-[11px] text-amber-200/60">
-              제출 시각 {new Date(summary.winnerSubmittedAt).toLocaleTimeString("ko-KR")}
-            </p>
-          )}
-        </div>
-      )}
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        {players.map((player) => {
-          const stats = computeHistoryStats(player.history);
-          return (
-            <div key={player.key} className="rounded-2xl border border-night-800/70 bg-night-900/50 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-lg font-semibold text-white">{player.label}</p>
-                <p className="text-xs text-night-400">시도 {stats.attempts}회</p>
-              </div>
-              {stats.bestEntry ? (
-                <div className="mt-3 rounded-xl border border-night-800/60 bg-night-950/40 p-3 text-xs">
-                  <p className="text-night-400">최소 연산기호</p>
-                  <p className="mt-1 font-mono text-base text-white">{stats.bestEntry.expression}</p>
-                  <p className="text-[11px] text-night-500">연산기호 {stats.bestEntry.operatorCount}개</p>
+          {summary.problems.map((problem) => {
+            const problemReasonLabel = translateSummaryReason(problem.reason);
+            const resultLabel = problem.winnerId ? `${problem.winnerLabel} 승` : "무승부";
+            return (
+              <div
+                key={`problem-${problem.problemNumber}`}
+                className="rounded-2xl border border-night-800/60 bg-night-950/40 p-3"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-white">문제 {problem.problemNumber}</p>
+                  <p
+                    className={`text-xs font-semibold ${
+                      problem.winnerId ? "text-emerald-300" : "text-night-300"
+                    }`}
+                  >
+                    {resultLabel}
+                  </p>
                 </div>
-              ) : (
-                <p className="mt-3 text-xs text-night-500">기록이 없습니다.</p>
-              )}
-              {typeof stats.averageOperatorCount === "number" && (
-                <p className="mt-2 text-xs text-night-400">
-                  평균 연산기호 {stats.averageOperatorCount}개
+                <p className="mt-1 text-xs text-night-400">
+                  연산기호 {problem.operatorCount !== null ? `${problem.operatorCount}개` : "-"} ·{" "}
+                  {problemReasonLabel}
                 </p>
-              )}
-              <div className="mt-3 max-h-40 space-y-2 overflow-y-auto pr-1 text-xs">
-                {player.history.length === 0 && (
-                  <p className="text-night-500">최근 제출 기록이 없습니다.</p>
+                {problem.expression && (
+                  <p className="mt-2 break-all font-mono text-sm text-white">{problem.expression}</p>
                 )}
-                {player.history
-                  .slice(-5)
-                  .reverse()
-                  .map((entry, index) => (
-                    <div
-                      key={`${entry.timestamp}-${index}`}
-                      className="rounded-lg border border-night-800/60 bg-night-950/30 p-2"
-                    >
-                      <p className="font-semibold text-white">{entry.expression}</p>
-                      <p className="text-[11px] text-night-500">연산기호 {entry.operatorCount}개</p>
-                    </div>
-                  ))}
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
       {roomClosedReason && <p className="mt-3 text-xs text-night-500">{roomClosedReason}</p>}
       <div className="mt-4 flex flex-wrap gap-3">
