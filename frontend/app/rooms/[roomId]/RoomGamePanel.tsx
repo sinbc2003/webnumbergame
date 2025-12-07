@@ -2509,6 +2509,11 @@ function PlayerPanel({
     }
   };
 
+  const latestMetTargetEntry = useMemo(
+    () => history.find((entry) => entry.metTarget),
+    [history],
+  );
+
   if (focusLayout) {
     const bestEntry =
       history.length === 0
@@ -2584,22 +2589,37 @@ function PlayerPanel({
                   </div>
                 ) : (
                   <div className="flex-1 space-y-3 overflow-y-auto p-3 pr-2">
-                    {history.map((entry, index) => (
-                      <div
-                        key={`${entry.timestamp}-${index}`}
-                        className="rounded-2xl border border-night-800/70 bg-night-900/60 p-3 text-sm text-night-200"
-                      >
-                        <p className="break-all font-semibold text-white">{entry.expression}</p>
-                        <p className="text-xs text-night-400">연산기호 {entry.operatorCount}개</p>
-                      </div>
-                    ))}
+                    {history.map((entry, index) => {
+                      const hideExpression = entry.metTarget && !isMine;
+                      return (
+                        <div
+                          key={`${entry.timestamp}-${index}`}
+                          className="rounded-2xl border border-night-800/70 bg-night-900/60 p-3 text-sm text-night-200"
+                        >
+                          {hideExpression ? (
+                            <p className="font-semibold text-emerald-300">🎯 목표값 달성! 식은 비공개입니다.</p>
+                          ) : (
+                            <p className="break-all font-semibold text-white">{entry.expression}</p>
+                          )}
+                          <p className={`text-xs ${hideExpression ? "text-emerald-200/80" : "text-night-400"}`}>
+                            연산기호 {entry.operatorCount}개
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
               {bestEntry && (
                 <div className="rounded-2xl border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100">
                   <p className="font-semibold">🏆 최고 기록</p>
-                  <p className="mt-1 break-all font-mono text-lg text-white">{bestEntry.expression}</p>
+                  <p
+                    className={`mt-1 break-all font-mono text-lg ${
+                      bestEntry.metTarget && !isMine ? "text-emerald-300" : "text-white"
+                    }`}
+                  >
+                    {bestEntry.metTarget && !isMine ? "🎯 목표값 달성! 식은 비공개입니다." : bestEntry.expression}
+                  </p>
                   <p className="text-xs text-amber-200/70">연산기호 {bestEntry.operatorCount}개</p>
                 </div>
               )}
@@ -2659,13 +2679,29 @@ function PlayerPanel({
         <p className="text-xs font-semibold text-night-300">최근 기록</p>
         <div className="mt-2 max-h-36 space-y-2 overflow-y-auto text-xs text-night-400">
           {history.length === 0 && <p>아직 제출 기록이 없습니다.</p>}
-          {history.map((entry, index) => (
-            <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
-            <p className="break-all font-semibold text-white">{entry.expression}</p>
-            <p className="text-[11px] text-night-400">연산기호 {entry.operatorCount}개</p>
-            </div>
-          ))}
+          {history.map((entry, index) => {
+            const hideExpression = entry.metTarget && !isMine;
+            return (
+              <div key={`${entry.timestamp}-${index}`} className="rounded border border-night-800/70 bg-night-900/40 p-2">
+                {hideExpression ? (
+                  <p className="font-semibold text-emerald-300">🎯 목표값 달성! 식은 비공개입니다.</p>
+                ) : (
+                  <p className="break-all font-semibold text-white">{entry.expression}</p>
+                )}
+                <p className={`text-[11px] ${hideExpression ? "text-emerald-200/80" : "text-night-400"}`}>
+                  연산기호 {entry.operatorCount}개
+                </p>
+              </div>
+            );
+          })}
         </div>
+        {!isMine && latestMetTargetEntry && (
+          <div className="mt-2 rounded border border-emerald-400/60 bg-emerald-500/10 p-2 text-[11px] text-emerald-100">
+            <p className="font-semibold text-white">목표 달성 정보</p>
+            <p className="mt-1 text-base font-black text-white">연산기호 {latestMetTargetEntry.operatorCount}개</p>
+            <p className="text-[10px] text-emerald-200/80">식은 비공개로 유지됩니다.</p>
+          </div>
+        )}
       </div>
     </div>
   );
