@@ -1195,23 +1195,23 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
                   };
                 });
               }
+              const historyEntry: HistoryEntry = {
+                expression: payload.submission!.expression,
+                operatorCount: submissionCost,
+                timestamp: new Date().toISOString(),
+                submittedAt: payload.submission!.submitted_at ?? new Date().toISOString(),
+                isOptimal: Boolean(payload.submission!.is_optimal),
+                metTarget,
+              };
               setBoards((prev) => {
-                const entry: HistoryEntry = {
-                  expression: payload.submission!.expression,
-                  operatorCount: submissionCost,
-                  timestamp: new Date().toISOString(),
-                  submittedAt: payload.submission!.submitted_at ?? new Date().toISOString(),
-                  isOptimal: Boolean(payload.submission!.is_optimal),
-                  metTarget,
-                };
-                const nextHistory: HistoryEntry[] = [entry, ...prev[slot].history].slice(0, 10);
+                const nextHistory: HistoryEntry[] = [historyEntry, ...prev[slot].history].slice(0, 10);
                 return {
                   ...prev,
                   [slot]: { ...prev[slot], history: nextHistory },
                 };
               });
               roundHistoryRef.current[slot] = [
-                entry,
+                historyEntry,
                 ...roundHistoryRef.current[slot],
               ].slice(0, ROUND_HISTORY_LIMIT);
             }
