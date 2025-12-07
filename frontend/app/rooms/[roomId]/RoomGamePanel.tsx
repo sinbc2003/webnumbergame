@@ -1399,14 +1399,19 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
           case "round_finished": {
             const reason = payload.reason ?? "optimal";
             const winnerSubmission = payload.winner_submission;
-            const winnerId =
+            const rawWinnerId =
               payload.winner_user_id ?? winnerSubmission?.user_id ?? payload.winner_submission_id ?? null;
             const totalProblemsCount =
               payload.total_problems ??
               activeMatchRef.current?.total_problems ??
               roundProblemSummariesRef.current.length;
             const problemSummaries = buildProblemSummaries(totalProblemsCount);
-            const finalScore = problemWinsRef.current ?? { playerOne: 0, playerTwo: 0 };
+            const finalScore = {
+              playerOne: problemWinsRef.current?.playerOne ?? 0,
+              playerTwo: problemWinsRef.current?.playerTwo ?? 0,
+            };
+            const isTie = finalScore.playerOne === finalScore.playerTwo;
+            const winnerId = isTie ? null : rawWinnerId;
 
             if (payload.include_problem_state !== false) {
               handleProblemOutcome(payload);
@@ -1439,7 +1444,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
             setRoundOutcome((prev) =>
               prev ?? {
                 reason,
-                winnerId,
+                winnerId: rawWinnerId,
                 operatorCount:
                   typeof winnerSubmission?.cost === "number" ? winnerSubmission.cost : null,
                 submittedAt: winnerSubmission?.submitted_at ?? null,
