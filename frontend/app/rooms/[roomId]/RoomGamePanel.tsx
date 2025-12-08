@@ -1235,7 +1235,12 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
               }
               return [...prev, payload.participant!];
             });
-            if (payload.participant?.user_id === user?.id) {
+            const joinedUserId = payload.participant?.user_id;
+            const joinedRole = payload.participant?.role;
+            const shouldRefresh =
+              joinedUserId === user?.id ||
+              (isHost && joinedRole === "player");
+            if (shouldRefresh) {
               refreshRoomSnapshot();
             }
             break;
@@ -1611,6 +1616,7 @@ export default function RoomGamePanel({ room, participants, onPlayerFocusChange 
     applyActiveMatchPatch,
     handleProblemOutcome,
     buildProblemSummaries,
+    isHost,
   ]);
 
   useEffect(() => {
